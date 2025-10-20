@@ -22,32 +22,30 @@
         setLogLevel('debug'); // Activar logs de Firebase
 
         // Inicializar Firebase
-        if (firebaseConfig) {
-            const app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
+        const authenticate = async () => {
+             if (!firebaseConfig) {
+                document.getElementById('loading-indicator').textContent = "Error: Configuración de Firebase no disponible.";
+                return;
+            }
+            
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
 
-            // Función de autenticación (usando el token proporcionado o anónimamente)
-            const authenticate = async () => {
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                        console.log("Autenticación exitosa con token personalizado.");
-                    } else {
-                        await signInAnonymously(auth);
-                        console.log("Autenticación anónima exitosa.");
-                    }
-                    // Una vez autenticado, inicializa la app principal
-                    initDashboard(); 
-                } catch (error) {
-                    console.error("Error de autenticación de Firebase:", error);
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
                 }
-            };
-            authenticate();
-        } else {
-            document.getElementById('loading-indicator').textContent = "Error: Configuración de Firebase no disponible.";
-            console.error("Configuración de Firebase no disponible.");
-        }
+                
+                initDashboard(); 
+
+            } catch (error) {
+                console.error("Error de autenticación de Firebase:", error);
+                document.getElementById('loading-indicator').textContent = "Error de conexión. Por favor, recarga o verifica tu conexión a Internet.";
+            }
+        };
 
         // --- ESTADO Y ELEMENTOS ---
         const ELEMENTS = {
@@ -172,7 +170,7 @@
                 // El onSnapshot se encargará de re-renderizar la lista
             } catch (error) {
                 console.error("Error al actualizar el estado:", error);
-                alert("Error al actualizar el estado. Revisa la consola.");
+                // Usar un modal o un mensaje de error en la UI si fuera una app de producción
             } finally {
                 e.target.disabled = false;
             }
@@ -197,12 +195,13 @@
                     orders.push({ id: doc.id, ...doc.data() });
                 });
                 renderOrders(orders);
-                console.log(`Pedidos cargados: ${orders.length}`);
             }, (error) => {
                 console.error("Error al escuchar pedidos:", error);
                 ELEMENTS.ordersList.innerHTML = `<p class="text-center text-red-500 py-10 text-lg">Error al cargar pedidos: ${error.message}</p>`;
             });
         }
+
+        authenticate();
     </script>
     <style>
         :root {
