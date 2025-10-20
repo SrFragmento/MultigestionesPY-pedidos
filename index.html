@@ -5,188 +5,324 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Pedidos Mayoristas</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Configuración Global de Firebase (MANDATORIA)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    
+    <style>
+        /* CSS de Diseño Llamativo y Profesional */
+        :root {
+            font-family: 'Inter', sans-serif;
+            scroll-behavior: smooth; /* Para el scroll suave del botón */
+        }
+        body {
+            background-color: #E0F2F1;
+            padding: 1rem;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(10, 20, 40, 0.15);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #1E3A8A;
+            color: white;
+            padding: 3rem 1.5rem 1.5rem;
+            text-align: center;
+        }
+        .brand-title {
+            background-color: #BFDBFE;
+            color: #1E3A8A;
+            padding: 8px 16px;
+            border-radius: 12px;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 0.95rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .price-badge {
+            background-color: #FACC15;
+            color: #1F2937;
+            font-weight: 900;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 1rem;
+            margin-bottom: 6px;
+            display: inline-block;
+        }
+        .logo-placeholder {
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 800;
+            color: white;
+            border-radius: 15px;
+            text-align: center;
+            line-height: 1.2;
+            padding: 6px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            flex-shrink: 0;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        .filter-button.active {
+            background-color: #FACC15;
+            color: #1E3A8A;
+            font-weight: 800;
+            border: 2px solid #1E3A8A;
+        }
+        .filter-button {
+            transition: all 0.2s;
+        }
+        .add-to-cart-btn {
+            background-color: #10B981 !important;
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4) !important;
+        }
+        /* Ocultar el indicador de carga que ya no se necesita */
+        #loading-indicator {
+            display: none !important;
+        }
+        /* Estilos del botón flotante */
+        #scroll-to-top-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background-color: #FACC15; /* Amarillo */
+            color: #1E3A8A; /* Azul */
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            transition: opacity 0.3s;
+            opacity: 0.9;
+        }
+        #scroll-to-top-btn:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
 
-        // Variables globales para la aplicación
-        window.app = null;
-        window.db = null;
-        window.auth = null;
-        window.dbReady = false; // Nuevo indicador de estado de la DB
-        
-        setLogLevel('debug'); 
+    <div class="max-w-4xl mx-auto card mt-4 mb-16">
 
-        // Estado Global de la Aplicación
+        <!-- Header y Contacto -->
+        <header class="header">
+            <h1 class="text-4xl font-extrabold mb-1 tracking-wider">SISTEMA DE PEDIDOS MAYORISTAS</h1>
+            <p class="text-xl font-light opacity-90 mb-4">MULTIGESTIONES PY</p>
+            <p class="text-lg font-bold bg-red-600 text-white p-2 rounded-lg shadow-xl">
+                🚨 Venta Mínima 3 Unidades por Artículo (Abarrotes/Snacks) 🚨
+            </p>
+        </header>
+
+        <main class="p-6 sm:p-10">
+
+            <!-- VISTA DEL CATÁLOGO -->
+            <div id="catalog-view">
+                
+                <div class="flex justify-between items-center mb-8 border-b pb-4 border-gray-200">
+                    <h2 class="text-3xl font-bold text-gray-800">Catálogo de Productos</h2>
+                    <button id="view-cart-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-5 rounded-full shadow-xl transition duration-200 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        Ver Carrito (<span id="cart-count">0</span>)
+                    </button>
+                </div>
+                
+                <!-- Filtros -->
+                <div class="mb-8">
+                    <div id="filter-container" class="flex flex-wrap gap-2 sm:gap-4">
+                        <!-- Botones de Categoría se insertarán aquí -->
+                    </div>
+                </div>
+
+                <!-- Lista de Productos -->
+                <div id="product-list" class="space-y-4">
+                    <!-- Los productos se insertarán aquí por JavaScript -->
+                </div>
+
+                <div id="loading-indicator" class="text-center py-12 text-2xl text-indigo-600 font-semibold hidden">Cargando...</div>
+            </div>
+
+
+            <!-- VISTA DEL CARRITO Y FORMULARIO DE CONFIRMACIÓN -->
+            <div id="cart-view" class="hidden">
+                <button id="back-to-catalog-btn" class="text-indigo-600 hover:text-indigo-800 font-bold mb-6 flex items-center text-lg">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Volver al Catálogo
+                </button>
+
+                <h2 class="text-4xl font-extrabold text-gray-800 mb-6 border-b pb-2 border-indigo-400">Resumen de Pedido</h2>
+
+                <div id="cart-summary" class="bg-indigo-50 p-5 rounded-xl mb-6 shadow-inner">
+                    <div id="cart-item-details" class="cart-item-list space-y-4 mb-4">
+                        <!-- Detalles del carrito aquí -->
+                        <p id="empty-cart-message" class="text-gray-500 text-center py-6 text-lg font-medium">🛒 El carrito está vacío. ¡Añade productos!</p>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-4 border-t border-indigo-200">
+                        <span class="text-2xl font-bold text-gray-900">TOTAL:</span>
+                        <span id="cart-total" class="text-3xl font-extrabold text-red-600">Gs. 0</span>
+                    </div>
+                    <p id="min-qty-alert" class="text-base text-red-700 mt-3 font-bold hidden">⚠️ **ADVERTENCIA:** Verifica la cantidad mínima (3 unidades) en los artículos mayoristas.</p>
+                </div>
+
+                <!-- Formulario de Cliente -->
+                <h3 class="text-2xl font-bold text-gray-800 mb-4">Datos del Cliente</h3>
+                <form id="client-form" class="space-y-5">
+                    <div>
+                        <label for="client-name" class="block text-sm font-medium text-gray-700">Nombre o Razón Social</label>
+                        <input type="text" id="client-name" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="client-phone" class="block text-sm font-medium text-gray-700">Teléfono / WhatsApp</label>
+                        <input type="text" id="client-phone" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="client-address" class="block text-sm font-medium text-gray-700">Dirección de Entrega</label>
+                        <textarea id="client-address" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 border focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                    </div>
+
+                    <button type="submit" id="confirm-order-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xl py-4 rounded-xl shadow-2xl transition duration-200 disabled:opacity-50">
+                        <span id="btn-text">CONFIRMAR PEDIDO Y ENVIAR</span>
+                    </button>
+                    <p id="order-status" class="text-center mt-4 font-bold hidden"></p>
+                </form>
+            </div>
+
+            <!-- MODAL DE CONFIRMACIÓN DE ENVÍO -->
+            <div id="confirmation-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-50">
+                <div class="bg-white p-10 rounded-2xl shadow-2xl max-w-md w-full text-center border-t-8 border-emerald-500">
+                    <svg class="w-20 h-20 text-emerald-500 mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h3 class="text-2xl font-extrabold text-gray-900 mb-3">¡Pedido Enviado!</h3>
+                    <p class="text-gray-700 mb-8 font-medium">Se ha abierto una conversación de WhatsApp para finalizar el envío de la orden.</p>
+                    <button id="close-modal-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 shadow-lg">
+                        Cerrar y Volver
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+    
+    <!-- BOTÓN FLOTANTE "SUBIR ARRIBA" -->
+    <button id="scroll-to-top-btn" class="hidden">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+    </button>
+    
+    <script>
+        // ESTADO GLOBAL y PRODUCTOS (Definiciones movidas aquí)
         const state = {
             cart: JSON.parse(localStorage.getItem('multigestiones_cart')) || [],
             currentFilter: 'Todos',
         };
 
-        const ELEMENTS = {
-            productList: document.getElementById('product-list'),
-            filterContainer: document.getElementById('filter-container'),
-            cartCount: document.getElementById('cart-count'),
-            cartView: document.getElementById('cart-view'),
-            catalogView: document.getElementById('catalog-view'),
-            viewCartBtn: document.getElementById('view-cart-btn'),
-            backToCatalogBtn: document.getElementById('back-to-catalog-btn'),
-            cartItemDetails: document.getElementById('cart-item-details'),
-            cartTotal: document.getElementById('cart-total'),
-            emptyCartMessage: document.getElementById('empty-cart-message'),
-            clientForm: document.getElementById('client-form'),
-            confirmOrderBtn: document.getElementById('confirm-order-btn'),
-            orderStatus: document.getElementById('order-status'),
-            confirmationModal: document.getElementById('confirmation-modal'),
-            closeModalBtn: document.getElementById('close-modal-btn'),
-            minQtyAlert: document.getElementById('min-qty-alert'),
-            loadingIndicator: document.getElementById('loading-indicator'),
-            btnText: document.getElementById('btn-text'),
-        };
-
-        // --- INICIALIZACIÓN DE FIREBASE Y AUTHENTICACIÓN ---
-
-        const authenticate = async () => {
-            if (!firebaseConfig) {
-                console.error("Configuración de Firebase no disponible. Cargando modo offline.");
-                window.dbReady = false;
-                window.mainApp.init(); 
-                return;
-            }
-
-            try {
-                window.app = initializeApp(firebaseConfig);
-                window.db = getFirestore(window.app);
-                window.auth = getAuth(window.app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(window.auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(window.auth);
-                }
-                
-                window.dbReady = true; // DB lista
-                window.mainApp.init(); 
-
-            } catch (error) {
-                console.error("Error de conexión o autenticación de Firebase. Cargando modo offline:", error);
-                window.dbReady = false;
-                window.mainApp.init(); // Cargar la app incluso si falla la DB
-            }
-        };
-
-        // Exportar funciones esenciales para el código de la aplicación
-        window.firebaseExports = {
-            addDoc,
-            collection,
-            serverTimestamp,
-        };
-
-        // --- DEFINICIÓN DE PRODUCTOS Y LÓGICA DE LA APP (MISMO CÓDIGO) ---
+        // --- CONFIGURACIÓN CLAVE ---
+        const BUSINESS_PHONE_NUMBER = "595981923378"; 
 
         // Precios en Guaraníes (Gs.)
         const PRODUCTS = [
             // CATERORÍA DE ALQUILER PARA EVENTOS (Mínimo 1)
-            { id: 1, name: "Silla Plástica Reforzada", brand: "Servicios", presentation: "Unidad/Evento", price: 1500, category: "Alquiler Eventos", logoColor: "#34d399", logoText: "Silla 🪑", isRental: true, min: 1 },
-            { id: 2, name: "Mesa Redonda (10 personas)", brand: "Servicios", presentation: "Unidad/Evento", price: 15000, category: "Alquiler Eventos", logoColor: "#34d399", logoText: "Mesa 🍽️", isRental: true, min: 1 },
-            { id: 3, name: "Mesa Larga (8 personas)", brand: "Servicios", presentation: "Unidad/Evento", price: 12000, category: "Alquiler Eventos", logoColor: "#34d399", logoText: "Mesa 📏", isRental: true, min: 1 },
-            { id: 4, name: "Mantel Blanco de Tela", brand: "Servicios", presentation: "Unidad/Evento", price: 7000, category: "Alquiler Eventos", logoColor: "#fcd34d", logoText: "Mantel", isRental: true, min: 1 },
-            { id: 5, name: "Cubiertos Metálicos (Set)", brand: "Servicios", presentation: "Set/Evento", price: 800, category: "Alquiler Eventos", logoColor: "#94a3b8", logoText: "Cubiertos", isRental: true, min: 1 },
-            { id: 6, name: "Cubre Sillas", brand: "Servicios", presentation: "Unidad/Evento", price: 1000, category: "Alquiler Eventos", logoColor: "#fcd34d", logoText: "Cubre", isRental: true, min: 1 },
-            { id: 7, name: "Plato Cerámica (Principal)", brand: "Servicios", presentation: "Unidad/Evento", price: 900, category: "Alquiler Eventos", logoColor: "#94a3b8", logoText: "Plato", isRental: true, min: 1 },
-            { id: 8, name: "Vasos de Cristal", brand: "Servicios", presentation: "Unidad/Evento", price: 700, category: "Alquiler Eventos", logoColor: "#94a3b8", logoText: "Vaso", isRental: true, min: 1 },
-            { id: 9, name: "Plato Plástico Reforzado", brand: "Plásticos", presentation: "Unidad/Evento", price: 600, category: "Alquiler Eventos", logoColor: "#38bdf8", logoText: "Plástico", isRental: true, min: 1 },
-            { id: 10, name: "Vasos Plásticos Reutilizables", brand: "Plásticos", presentation: "Unidad/Evento", price: 500, category: "Alquiler Eventos", logoColor: "#38bdf8", logoText: "Plástico", isRental: true, min: 1 },
+            { id: 1, name: "Silla Plástica Reforzada", brand: "Servicios", presentation: "Unidad/Evento", price: 1500, category: "Alquiler Eventos", logoColor: "#10B981", logoText: "Silla 🪑", isRental: true, min: 1 },
+            { id: 2, name: "Mesa Redonda (10 personas)", brand: "Servicios", presentation: "Unidad/Evento", price: 15000, category: "Alquiler Eventos", logoColor: "#F59E0B", logoText: "Mesa 🍽️", isRental: true, min: 1 },
+            { id: 3, name: "Mesa Larga (8 personas)", brand: "Servicios", presentation: "Unidad/Evento", price: 12000, category: "Alquiler Eventos", logoColor: "#F59E0B", logoText: "Mesa 📏", isRental: true, min: 1 },
+            { id: 4, name: "Mantel Blanco de Tela", brand: "Servicios", presentation: "Unidad/Evento", price: 7000, category: "Alquiler Eventos", logoColor: "#EAB308", logoText: "Mantel", isRental: true, min: 1 },
+            { id: 5, name: "Cubiertos Metálicos (Set)", brand: "Servicios", presentation: "Set/Evento", price: 800, category: "Alquiler Eventos", logoColor: "#94A3B8", logoText: "Cubiertos", isRental: true, min: 1 },
+            { id: 6, name: "Cubre Sillas", brand: "Servicios", presentation: "Unidad/Evento", price: 1000, category: "Alquiler Eventos", logoColor: "#EAB308", logoText: "Cubre", isRental: true, min: 1 },
+            { id: 7, name: "Plato Cerámica (Principal)", brand: "Servicios", presentation: "Unidad/Evento", price: 900, category: "Alquiler Eventos", logoColor: "#94A3B8", logoText: "Plato", isRental: true, min: 1 },
+            { id: 8, name: "Vasos de Cristal", brand: "Servicios", presentation: "Unidad/Evento", price: 700, category: "Alquiler Eventos", logoColor: "#94A3B8", logoText: "Vaso", isRental: true, min: 1 },
+            { id: 9, name: "Plato Plástico Reforzado", brand: "Plásticos", presentation: "Unidad/Evento", price: 600, category: "Alquiler Eventos", logoColor: "#0EA5E9", logoText: "Plástico", isRental: true, min: 1 },
+            { id: 10, name: "Vasos Plásticos Reutilizables", brand: "Plásticos", presentation: "Unidad/Evento", price: 500, category: "Alquiler Eventos", logoColor: "#0EA5E9", logoText: "Plástico", isRental: true, min: 1 },
 
             // ABARROTES: LÁCTEOS (Mayorista - Mínimo 3)
-            { id: 11, name: "Leche Entera UAT", brand: "Trébol", presentation: "1 Litro", price: 8500, category: "Lácteos", logoColor: "#059669", logoText: "Trébol", isRental: false, min: 3 },
-            { id: 12, name: "Yogurt Entero Durazno", brand: "Trébol", presentation: "1 Litro", price: 9200, category: "Lácteos", logoColor: "#059669", logoText: "Trébol 🍑", isRental: false, min: 3 },
-            { id: 13, name: "Manteca Premium", brand: "Trébol", presentation: "250g", price: 12500, category: "Lácteos", logoColor: "#059669", logoText: "Trébol", isRental: false, min: 3 },
-            { id: 14, name: "Postre Vainilla", brand: "Trébol", presentation: "120g", price: 4000, category: "Lácteos", logoColor: "#059669", logoText: "Trébol", isRental: false, min: 3 },
-            { id: 15, name: "Leche Descremada UAT", brand: "Lactolanda", presentation: "1 Litro", price: 8800, category: "Lácteos", logoColor: "#f59e0b", logoText: "Landa", isRental: false, min: 3 },
-            { id: 16, name: "Queso Paraguay Fresco", brand: "Lactolanda", presentation: "500g", price: 18500, category: "Lácteos", logoColor: "#f59e0b", logoText: "Landa 🧀", isRental: false, min: 3 },
-            { id: 17, name: "Dulce de Leche Clásico", brand: "Lactolanda", presentation: "400g", price: 15000, category: "Lácteos", logoColor: "#f59e0b", logoText: "Landa", isRental: false, min: 3 },
-            { id: 18, name: "Leche Cultivada", brand: "Lactolanda", presentation: "1 Litro", price: 9500, category: "Lácteos", logoColor: "#f59e0b", logoText: "Landa", isRental: false, min: 3 },
+            { id: 11, name: "Leche Entera UAT", brand: "Trébol", presentation: "1 Litro", price: 8500, category: "Lácteos", logoColor: "#10B981", logoText: "Trébol", isRental: false, min: 3 },
+            { id: 12, name: "Yogurt Entero Durazno", brand: "Trébol", presentation: "1 Litro", price: 9200, category: "Lácteos", logoColor: "#10B981", logoText: "Trébol 🍑", isRental: false, min: 3 },
+            { id: 13, name: "Manteca Premium", brand: "Trébol", presentation: "250g", price: 12500, category: "Lácteos", logoColor: "#10B981", logoText: "Trébol", isRental: false, min: 3 },
+            { id: 14, name: "Postre Vainilla", brand: "Trébol", presentation: "120g", price: 4000, category: "Lácteos", logoColor: "#10B981", logoText: "Trébol", isRental: false, min: 3 },
+            { id: 15, name: "Leche Descremada UAT", brand: "Lactolanda", presentation: "1 Litro", price: 8800, category: "Lácteos", logoColor: "#F59E0B", logoText: "Landa", isRental: false, min: 3 },
+            { id: 16, name: "Queso Paraguay Fresco", brand: "Lactolanda", presentation: "500g", price: 18500, category: "Lácteos", logoColor: "#F59E0B", logoText: "Landa 🧀", isRental: false, min: 3 },
+            { id: 17, name: "Dulce de Leche Clásico", brand: "Lactolanda", presentation: "400g", price: 15000, category: "Lácteos", logoColor: "#F59E0B", logoText: "Landa", isRental: false, min: 3 },
+            { id: 18, name: "Leche Cultivada", brand: "Lactolanda", presentation: "1 Litro", price: 9500, category: "Lácteos", logoColor: "#F59E0B", logoText: "Landa", isRental: false, min: 3 },
 
             // ABARROTES: BEBIDAS (Mayorista - Mínimo 3)
-            { id: 19, name: "Coca-Cola Original", brand: "Coca-Cola", presentation: "2 Litros", price: 12000, category: "Bebidas", logoColor: "#e61818", logoText: "COKE 🔴", isRental: false, min: 3 },
-            { id: 20, name: "Coca-Cola Sin Azúcar", brand: "Coca-Cola", presentation: "1.5 Litros", price: 9500, category: "Bebidas", logoColor: "#e61818", logoText: "COKE Zero", isRental: false, min: 3 },
-            { id: 21, name: "Gaseosa Fanta Naranja", brand: "Coca-Cola", presentation: "2 Litros", price: 10500, category: "Bebidas", logoColor: "#f97316", logoText: "FANTA", isRental: false, min: 3 },
-            { id: 22, name: "Jugo (Sabor Naranja)", brand: "Pulp", presentation: "1 Litro", price: 7500, category: "Bebidas", logoColor: "#f97316", logoText: "Pulp 🍊", isRental: false, min: 3 },
-            { id: 23, name: "Cerveza Pilsen", brand: "Brahma", presentation: "Lata 350ml", price: 6000, category: "Bebidas", logoColor: "#fbbf24", logoText: "Brahma 🍺", isRental: false, min: 3 },
-            { id: 24, name: "Cerveza Lager", brand: "Pilsen", presentation: "Botella 1L", price: 11500, category: "Bebidas", logoColor: "#0369a1", logoText: "Pilsen", isRental: false, min: 3 },
-            { id: 25, name: "Agua Mineral sin Gas", brand: "Salus", presentation: "1.5 Litros", price: 4500, category: "Bebidas", logoColor: "#4c9cfd", logoText: "Salus", isRental: false, min: 3 },
-            { id: 26, name: "Cerveza Lata", brand: "Heineken", presentation: "330ml Lata", price: 7800, category: "Bebidas", logoColor: "#10b981", logoText: "Heineken 🍺", isRental: false, min: 3 },
-            { id: 27, name: "Gaseosa Guaraná", brand: "Guaraná", presentation: "2 Litros", price: 9000, category: "Bebidas", logoColor: "#3b82f6", logoText: "Guaraná", isRental: false, min: 3 },
-            { id: 28, name: "Agua Saborizada Manzana", brand: "Levité", presentation: "600ml", price: 5500, category: "Bebidas", logoColor: "#22c55e", logoText: "Levité", isRental: false, min: 3 },
-            { id: 29, name: "Vino Tinto Seco", brand: "Santa Helena", presentation: "750ml", price: 35000, category: "Bebidas", logoColor: "#dc2626", logoText: "Vino 🍷", isRental: false, min: 3 },
+            { id: 19, name: "Coca-Cola Original", brand: "Coca-Cola", presentation: "2 Litros", price: 12000, category: "Bebidas", logoColor: "#EF4444", logoText: "COKE 🔴", isRental: false, min: 3 },
+            { id: 20, name: "Coca-Cola Sin Azúcar", brand: "Coca-Cola", presentation: "1.5 Litros", price: 9500, category: "Bebidas", logoColor: "#EF4444", logoText: "COKE Zero", isRental: false, min: 3 },
+            { id: 21, name: "Gaseosa Fanta Naranja", brand: "Coca-Cola", presentation: "2 Litros", price: 10500, category: "Bebidas", logoColor: "#F97316", logoText: "FANTA", isRental: false, min: 3 },
+            { id: 22, name: "Jugo (Sabor Naranja)", brand: "Pulp", presentation: "1 Litro", price: 7500, category: "Bebidas", logoColor: "#F97316", logoText: "Pulp 🍊", isRental: false, min: 3 },
+            { id: 23, name: "Cerveza Pilsen", brand: "Brahma", presentation: "Lata 350ml", price: 6000, category: "Bebidas", logoColor: "#FBBF24", logoText: "Brahma 🍺", isRental: false, min: 3 },
+            { id: 24, name: "Cerveza Lager", brand: "Pilsen", presentation: "Botella 1L", price: 11500, category: "Bebidas", logoColor: "#0369A1", logoText: "Pilsen", isRental: false, min: 3 },
+            { id: 25, name: "Agua Mineral sin Gas", brand: "Salus", presentation: "1.5 Litros", price: 4500, category: "Bebidas", logoColor: "#4C9CFD", logoText: "Salus", isRental: false, min: 3 },
+            { id: 26, name: "Cerveza Lata", brand: "Heineken", presentation: "330ml Lata", price: 7800, category: "Bebidas", logoColor: "#10B981", logoText: "Heineken 🍺", isRental: false, min: 3 },
+            { id: 27, name: "Gaseosa Guaraná", brand: "Guaraná", presentation: "2 Litros", price: 9000, category: "Bebidas", logoColor: "#3B82F6", logoText: "Guaraná", isRental: false, min: 3 },
+            { id: 28, name: "Agua Saborizada Manzana", brand: "Levité", presentation: "600ml", price: 5500, category: "Bebidas", logoColor: "#22C55E", logoText: "Levité", isRental: false, min: 3 },
+            { id: 29, name: "Vino Tinto Seco", brand: "Santa Helena", presentation: "750ml", price: 35000, category: "Bebidas", logoColor: "#DC2626", logoText: "Vino 🍷", isRental: false, min: 3 },
 
             // ABARROTES: NO PERECEDEROS (Mayorista - Mínimo 3)
-            { id: 30, name: "Fideo Spaghetti", brand: "Fortaleza", presentation: "500g", price: 5000, category: "Abarrotes", logoColor: "#ef4444", logoText: "Fuerza", isRental: false, min: 3 },
-            { id: 31, name: "Fideo Tallarín", brand: "Adria", presentation: "500g", price: 4800, category: "Abarrotes", logoColor: "#1d4ed8", logoText: "Adria", isRental: false, min: 3 },
-            { id: 32, name: "Arroz Grano Largo Tipo 1", brand: "Universo", presentation: "1Kg", price: 8500, category: "Abarrotes", logoColor: "#9333ea", logoText: "Universo", isRental: false, min: 3 },
+            { id: 30, name: "Fideo Spaghetti", brand: "Fortaleza", presentation: "500g", price: 5000, category: "Abarrotes", logoColor: "#EF4444", logoText: "Fuerza", isRental: false, min: 3 },
+            { id: 31, name: "Fideo Tallarín", brand: "Adria", presentation: "500g", price: 4800, category: "Abarrotes", logoColor: "#1D4ED8", logoText: "Adria", isRental: false, min: 3 },
+            { id: 32, name: "Arroz Grano Largo Tipo 1", brand: "Universo", presentation: "1Kg", price: 8500, category: "Abarrotes", logoColor: "#9333EA", logoText: "Universo", isRental: false, min: 3 },
             { id: 33, name: "Harina de Trigo 000", brand: "Hijo de Tigre", presentation: "1Kg", price: 6500, category: "Abarrotes", logoColor: "#334155", logoText: "Tigre", isRental: false, min: 3 },
-            { id: 34, name: "Azúcar Rubia", brand: "Azucarera Nacional", presentation: "1Kg", price: 5200, category: "Abarrotes", logoColor: "#fb7185", logoText: "Azúcar", isRental: false, min: 3 },
-            { id: 35, name: "Sal Fina Yodada", brand: "Marina", presentation: "500g", price: 2500, category: "Abarrotes", logoColor: "#94a3b8", logoText: "Marina", isRental: false, min: 3 },
-            { id: 36, name: "Aceite Girasol", brand: "Cocinero", presentation: "900ml", price: 15000, category: "Abarrotes", logoColor: "#facc15", logoText: "Cocinero", isRental: false, min: 3 },
-            { id: 37, name: "Yerba Mate Clásica", brand: "Kurupí", presentation: "500g", price: 15500, category: "Abarrotes", logoColor: "#22c55e", logoText: "Kurupí", isRental: false, min: 3 },
+            { id: 34, name: "Azúcar Rubia", brand: "Azucarera Nacional", presentation: "1Kg", price: 5200, category: "Abarrotes", logoColor: "#FB7185", logoText: "Azúcar", isRental: false, min: 3 },
+            { id: 35, name: "Sal Fina Yodada", brand: "Marina", presentation: "500g", price: 2500, category: "Abarrotes", logoColor: "#94A3B8", logoText: "Marina", isRental: false, min: 3 },
+            { id: 36, name: "Aceite Girasol", brand: "Cocinero", presentation: "900ml", price: 15000, category: "Abarrotes", logoColor: "#FACC15", logoText: "Cocinero", isRental: false, min: 3 },
+            { id: 37, name: "Yerba Mate Clásica", brand: "Kurupí", presentation: "500g", price: 15500, category: "Abarrotes", logoColor: "#22C55E", logoText: "Kurupí", isRental: false, min: 3 },
             { id: 38, name: "Yerba Mate Compuesta", brand: "Selecta", presentation: "1Kg", price: 28000, category: "Abarrotes", logoColor: "#059669", logoText: "Selecta", isRental: false, min: 3 },
-            { id: 39, name: "Poroto Negro", brand: "El Molino", presentation: "1Kg", price: 9000, category: "Abarrotes", logoColor: "#9333ea", logoText: "Molino", isRental: false, min: 3 },
-            { id: 40, name: "Lentejas", brand: "El Molino", presentation: "500g", price: 6500, category: "Abarrotes", logoColor: "#9333ea", logoText: "Molino", isRental: false, min: 3 },
-            { id: 41, name: "Mayonesa Clásica", brand: "Hellmann's", presentation: "500g Pote", price: 13000, category: "Abarrotes", logoColor: "#facc15", logoText: "Hellman's", isRental: false, min: 3 },
-            { id: 42, name: "Ketchup", brand: "Heinz", presentation: "397g", price: 11500, category: "Abarrotes", logoColor: "#ef4444", logoText: "Heinz", isRental: false, min: 3 },
-            { id: 43, name: "Café Instantáneo", brand: "Nescafé", presentation: "100g", price: 18000, category: "Abarrotes", logoColor: "#994d1b", logoText: "Café", isRental: false, min: 3 },
-            { id: 44, name: "Mermelada Frutilla", brand: "Arcor", presentation: "400g", price: 9800, category: "Abarrotes", logoColor: "#dc2626", logoText: "Arcor 🍓", isRental: false, min: 3 },
-            { id: 45, name: "Caldo Cubitos Carne", brand: "Maggi", presentation: "Caja x 12", price: 7000, category: "Abarrotes", logoColor: "#f97316", logoText: "Maggi", isRental: false, min: 3 },
-            { id: 46, name: "Atún en Aceite", brand: "La Sirena", presentation: "170g Lata", price: 11000, category: "Abarrotes", logoColor: "#0891b2", logoText: "Sirena 🐟", isRental: false, min: 3 },
-            { id: 47, name: "Arvejas en Lata", brand: "Arcor", presentation: "300g Lata", price: 4500, category: "Abarrotes", logoColor: "#dc2626", logoText: "Arcor", isRental: false, min: 3 },
-            { id: 48, name: "Tomate Pelado Cubeteado", brand: "Mutti", presentation: "400g Lata", price: 8000, category: "Abarrotes", logoColor: "#b91c1c", logoText: "Mutti", isRental: false, min: 3 },
-            { id: 49, name: "Choclo en Grano", brand: "Arcor", presentation: "300g Lata", price: 5500, category: "Abarrotes", logoColor: "#dc2626", logoText: "Arcor 🌽", isRental: false, min: 3 },
-            { id: 50, name: "Salsa de Tomate Lista", brand: "Mutti", presentation: "520g Botella", price: 9000, category: "Abarrotes", logoColor: "#b91c1c", logoText: "Mutti", isRental: false, min: 3 },
+            { id: 39, name: "Poroto Negro", brand: "El Molino", presentation: "1Kg", price: 9000, category: "Abarrotes", logoColor: "#9333EA", logoText: "Molino", isRental: false, min: 3 },
+            { id: 40, name: "Lentejas", brand: "El Molino", presentation: "500g", price: 6500, category: "Abarrotes", logoColor: "#9333EA", logoText: "Molino", isRental: false, min: 3 },
+            { id: 41, name: "Mayonesa Clásica", brand: "Hellmann's", presentation: "500g Pote", price: 13000, category: "Abarrotes", logoColor: "#FACC15", logoText: "Hellman's", isRental: false, min: 3 },
+            { id: 42, name: "Ketchup", brand: "Heinz", presentation: "397g", price: 11500, category: "Abarrotes", logoColor: "#EF4444", logoText: "Heinz", isRental: false, min: 3 },
+            { id: 43, name: "Café Instantáneo", brand: "Nescafé", presentation: "100g", price: 18000, category: "Abarrotes", logoColor: "#994D1B", logoText: "Café", isRental: false, min: 3 },
+            { id: 44, name: "Mermelada Frutilla", brand: "Arcor", presentation: "400g", price: 9800, category: "Abarrotes", logoColor: "#DC2626", logoText: "Arcor 🍓", isRental: false, min: 3 },
+            { id: 45, name: "Caldo Cubitos Carne", brand: "Maggi", presentation: "Caja x 12", price: 7000, category: "Abarrotes", logoColor: "#F97316", logoText: "Maggi", isRental: false, min: 3 },
+            { id: 46, name: "Atún en Aceite", brand: "La Sirena", presentation: "170g Lata", price: 11000, category: "Abarrotes", logoColor: "#0891B2", logoText: "Sirena 🐟", isRental: false, min: 3 },
+            { id: 47, name: "Arvejas en Lata", brand: "Arcor", presentation: "300g Lata", price: 4500, category: "Abarrotes", logoColor: "#DC2626", logoText: "Arcor", isRental: false, min: 3 },
+            { id: 48, name: "Tomate Pelado Cubeteado", brand: "Mutti", presentation: "400g Lata", price: 8000, category: "Abarrotes", logoColor: "#B91C1C", logoText: "Mutti", isRental: false, min: 3 },
+            { id: 49, name: "Choclo en Grano", brand: "Arcor", presentation: "300g Lata", price: 5500, category: "Abarrotes", logoColor: "#DC2626", logoText: "Arcor 🌽", isRental: false, min: 3 },
+            { id: 50, name: "Salsa de Tomate Lista", brand: "Mutti", presentation: "520g Botella", price: 9000, category: "Abarrotes", logoColor: "#B91C1C", logoText: "Mutti", isRental: false, min: 3 },
 
             // ABARROTES: SNACKS (Mayorista - Mínimo 3)
-            { id: 51, name: "Papas Fritas Onduladas", brand: "Karupá", presentation: "60g", price: 3500, category: "Snacks", logoColor: "#7e22ce", logoText: "Karupá 🥔", isRental: false, min: 3 },
-            { id: 52, name: "Chizitos Queso", brand: "Doña", presentation: "80g", price: 4200, category: "Snacks", logoColor: "#ca8a04", logoText: "Doña 🧀", isRental: false, min: 3 },
-            { id: 53, name: "Galleta Chocolate Rellena", brand: "Oreo", presentation: "Pack", price: 6500, category: "Snacks", logoColor: "#1e3a8a", logoText: "Oreo", isRental: false, min: 3 },
-            { id: 54, name: "Alfajor Triple Chocolate", brand: "Jorgito", presentation: "Unidad", price: 4500, category: "Snacks", logoColor: "#0f766e", logoText: "Jorgito", isRental: false, min: 3 },
-            { id: 55, name: "Maní Tostado Salado", brand: "Manisa", presentation: "100g", price: 4000, category: "Snacks", logoColor: "#84cc16", logoText: "Manisa", isRental: false, min: 3 },
-            { id: 56, name: "Galleta Vainilla", brand: "Arcor", presentation: "Pack x 6", price: 8000, category: "Snacks", logoColor: "#dc2626", logoText: "Arcor", isRental: false, min: 3 },
-            { id: 57, name: "Papas Fritas Lisas", brand: "Pringles", presentation: "Lata 120g", price: 15000, category: "Snacks", logoColor: "#ef4444", logoText: "Pringles", isRental: false, min: 3 },
-            { id: 58, name: "Caramelos Surtidos", brand: "Arcor", presentation: "Bolsa 500g", price: 12000, category: "Snacks", logoColor: "#dc2626", logoText: "Arcor", isRental: false, min: 3 },
+            { id: 51, name: "Papas Fritas Onduladas", brand: "Karupá", presentation: "60g", price: 3500, category: "Snacks", logoColor: "#7E22CE", logoText: "Karupá 🥔", isRental: false, min: 3 },
+            { id: 52, name: "Chizitos Queso", brand: "Doña", presentation: "80g", price: 4200, category: "Snacks", logoColor: "#CA8A04", logoText: "Doña 🧀", isRental: false, min: 3 },
+            { id: 53, name: "Galleta Chocolate Rellena", brand: "Oreo", presentation: "Pack", price: 6500, category: "Snacks", logoColor: "#1E3A8A", logoText: "Oreo", isRental: false, min: 3 },
+            { id: 54, name: "Alfajor Triple Chocolate", brand: "Jorgito", presentation: "Unidad", price: 4500, category: "Snacks", logoColor: "#0F766E", logoText: "Jorgito", isRental: false, min: 3 },
+            { id: 55, name: "Maní Tostado Salado", brand: "Manisa", presentation: "100g", price: 4000, category: "Snacks", logoColor: "#84CC16", logoText: "Manisa", isRental: false, min: 3 },
+            { id: 56, name: "Galleta Vainilla", brand: "Arcor", presentation: "Pack x 6", price: 8000, category: "Snacks", logoColor: "#DC2626", logoText: "Arcor", isRental: false, min: 3 },
+            { id: 57, name: "Papas Fritas Lisas", brand: "Pringles", presentation: "Lata 120g", price: 15000, category: "Snacks", logoColor: "#EF4444", logoText: "Pringles", isRental: false, min: 3 },
+            { id: 58, name: "Caramelos Surtidos", brand: "Arcor", presentation: "Bolsa 500g", price: 12000, category: "Snacks", logoColor: "#DC2626", logoText: "Arcor", isRental: false, min: 3 },
             
             // ABARROTES: CONGELADOS (Mayorista - Mínimo 3)
-            { id: 59, name: "Papas Fritas Prefritas", brand: "McCain", presentation: "1Kg Bolsa", price: 18000, category: "Congelados", logoColor: "#ef4444", logoText: "McCain 🍟", isRental: false, min: 3 },
-            { id: 60, name: "Nuggets de Pollo", brand: "Knorr", presentation: "500g Caja", price: 25000, category: "Congelados", logoColor: "#f97316", logoText: "Knorr", isRental: false, min: 3 },
-            { id: 61, name: "Pizza Muzzarella", brand: "Sadia", presentation: "Unidad", price: 28000, category: "Congelados", logoColor: "#4f46e5", logoText: "Sadia", isRental: false, min: 3 },
-            { id: 62, name: "Vegetales Mixtos", brand: "Quickfood", presentation: "500g Bolsa", price: 11000, category: "Congelados", logoColor: "#0ea5e9", logoText: "Quick", isRental: false, min: 3 },
-            { id: 63, name: "Hielo en Cubos", brand: "Génesis", presentation: "2Kg Bolsa", price: 4500, category: "Congelados", logoColor: "#3b82f6", logoText: "Génesis 🧊", isRental: false, min: 3 },
-            { id: 64, name: "Hamburguesa Carne", brand: "Sadia", presentation: "Caja x 4", price: 16000, category: "Congelados", logoColor: "#4f46e5", logoText: "Sadia", isRental: false, min: 3 },
+            { id: 59, name: "Papas Fritas Prefritas", brand: "McCain", presentation: "1Kg Bolsa", price: 18000, category: "Congelados", logoColor: "#EF4444", logoText: "McCain 🍟", isRental: false, min: 3 },
+            { id: 60, name: "Nuggets de Pollo", brand: "Knorr", presentation: "500g Caja", price: 25000, category: "Congelados", logoColor: "#F97316", logoText: "Knorr", isRental: false, min: 3 },
+            { id: 61, name: "Pizza Muzzarella", brand: "Sadia", presentation: "Unidad", price: 28000, category: "Congelados", logoColor: "#4F46E5", logoText: "Sadia", isRental: false, min: 3 },
+            { id: 62, name: "Vegetales Mixtos", brand: "Quickfood", presentation: "500g Bolsa", price: 11000, category: "Congelados", logoColor: "#0EA5E9", logoText: "Quick", isRental: false, min: 3 },
+            { id: 63, name: "Hielo en Cubos", brand: "Génesis", presentation: "2Kg Bolsa", price: 4500, category: "Congelados", logoColor: "#3B82F6", logoText: "Génesis 🧊", isRental: false, min: 3 },
+            { id: 64, name: "Hamburguesa Carne", brand: "Sadia", presentation: "Caja x 4", price: 16000, category: "Congelados", logoColor: "#4F46E5", logoText: "Sadia", isRental: false, min: 3 },
 
             // ABARROTES: LIMPIEZA (Mayorista - Mínimo 3)
-            { id: 65, name: "Detergente Lavaplatos Limón", brand: "Magistral", presentation: "500ml", price: 9500, category: "Limpieza", logoColor: "#06b6d4", logoText: "Magis 💧", isRental: false, min: 3 },
-            { id: 66, name: "Lavandina Desinfectante", brand: "Sapolio", presentation: "1 Litro", price: 6000, category: "Limpieza", logoColor: "#4f46e5", logoText: "Sapolio ⚡", isRental: false, min: 3 },
-            { id: 67, name: "Jabón en Polvo", brand: "OMO", presentation: "1Kg", price: 22000, category: "Limpieza", logoColor: "#0ea5e9", logoText: "OMO", isRental: false, min: 3 },
-            { id: 68, name: "Suavizante Concentrado", brand: "Vanish", presentation: "900ml", price: 15800, category: "Limpieza", logoColor: "#c026d3", logoText: "Vanish", isRental: false, min: 3 },
-            { id: 69, name: "Limpiador Vidrios", brand: "Mr. Músculo", presentation: "500ml", price: 8500, category: "Limpieza", logoColor: "#22c55e", logoText: "Músculo", isRental: false, min: 3 },
-            { id: 70, name: "Papel Higiénico Doble Hoja", brand: "Nevada", presentation: "Pack x 4", price: 14500, category: "Limpieza", logoColor: "#facc15", logoText: "Nevada", isRental: false, min: 3 },
-            { id: 71, name: "Jabón de Tocador", brand: "Dove", presentation: "Unidad", price: 4000, category: "Limpieza", logoColor: "#0ea5e9", logoText: "Dove", isRental: false, min: 3 },
-            { id: 72, name: "Bolsa de Basura Reforzada", brand: "Rey", presentation: "Pack x 10", price: 10000, category: "Limpieza", logoColor: "#1f2937", logoText: "Rey 👑", isRental: false, min: 3 },
-            { id: 73, name: "Limpiador Desinfectante", brand: "Lysoform", presentation: "500ml", price: 9800, category: "Limpieza", logoColor: "#4f46e5", logoText: "Lysoform", isRental: false, min: 3 },
+            { id: 65, name: "Detergente Lavaplatos Limón", brand: "Magistral", presentation: "500ml", price: 9500, category: "Limpieza", logoColor: "#06B6D4", logoText: "Magis 💧", isRental: false, min: 3 },
+            { id: 66, name: "Lavandina Desinfectante", brand: "Sapolio", presentation: "1 Litro", price: 6000, category: "Limpieza", logoColor: "#4F46E5", logoText: "Sapolio ⚡", isRental: false, min: 3 },
+            { id: 67, name: "Jabón en Polvo", brand: "OMO", presentation: "1Kg", price: 22000, category: "Limpieza", logoColor: "#0EA5E9", logoText: "OMO", isRental: false, min: 3 },
+            { id: 68, name: "Suavizante Concentrado", brand: "Vanish", presentation: "900ml", price: 15800, category: "Limpieza", logoColor: "#C026D3", logoText: "Vanish", isRental: false, min: 3 },
+            { id: 69, name: "Limpiador Vidrios", brand: "Mr. Músculo", presentation: "500ml", price: 8500, category: "Limpieza", logoColor: "#22C55E", logoText: "Músculo", isRental: false, min: 3 },
+            { id: 70, name: "Papel Higiénico Doble Hoja", brand: "Nevada", presentation: "Pack x 4", price: 14500, category: "Limpieza", logoColor: "#FACC15", logoText: "Nevada", isRental: false, min: 3 },
+            { id: 71, name: "Jabón de Tocador", brand: "Dove", presentation: "Unidad", price: 4000, category: "Limpieza", logoColor: "#0EA5E9", logoText: "Dove", isRental: false, min: 3 },
+            { id: 72, name: "Bolsa de Basura Reforzada", brand: "Rey", presentation: "Pack x 10", price: 10000, category: "Limpieza", logoColor: "#1F2937", logoText: "Rey 👑", isRental: false, min: 3 },
+            { id: 73, name: "Limpiador Desinfectante", brand: "Lysoform", presentation: "500ml", price: 9800, category: "Limpieza", logoColor: "#4F46E5", logoText: "Lysoform", isRental: false, min: 3 },
         ];
 
         const allCategories = PRODUCTS.map(p => p.category);
         const categories = [...new Set(allCategories)];
         categories.unshift('Todos'); 
+        
+        // Elementos definidos globalmente pero asignados en init
+        let ELEMENTS; 
 
-        // --- FUNCIONES DE CARRITO ---
-
+        // --- FUNCIONES DE CARRITO (Iguales) ---
         function saveCart() {
             localStorage.setItem('multigestiones_cart', JSON.stringify(state.cart));
             updateCartUI();
@@ -197,13 +333,13 @@
             const itemIndex = state.cart.findIndex(item => item.id === productId);
             if (itemIndex > -1) {
                 if (newQuantity <= 0) {
-                    state.cart.splice(itemIndex, 1); // Quitar si la cantidad es 0 o menos
+                    state.cart.splice(itemIndex, 1);
                 } else {
                     state.cart[itemIndex].quantity = newQuantity;
                 }
             }
             saveCart();
-            renderProducts(state.currentFilter); // Actualizar el catálogo
+            renderProducts(state.currentFilter);
         }
 
         function addToCart(productId) {
@@ -214,10 +350,8 @@
             const minQty = product.isRental ? 1 : 3;
 
             if (existingItemIndex > -1) {
-                // Si ya está en el carrito, aumentar por la cantidad mínima
                 state.cart[existingItemIndex].quantity += minQty;
             } else {
-                // Si no está, añadir la cantidad mínima
                 state.cart.push({
                     id: productId,
                     name: product.name,
@@ -234,22 +368,24 @@
         }
 
         function updateCartUI() {
-            elements.cartCount.textContent = state.cart.reduce((total, item) => total + item.quantity, 0);
+            if (!ELEMENTS || !ELEMENTS.cartCount) return; 
+            ELEMENTS.cartCount.textContent = state.cart.reduce((total, item) => total + item.quantity, 0);
             renderCartSummary();
         }
 
         function renderCartSummary() {
-            elements.cartItemDetails.innerHTML = '';
+            if (!ELEMENTS || !ELEMENTS.cartItemDetails) return;
+            ELEMENTS.cartItemDetails.innerHTML = '';
             let total = 0;
             const itemsInCart = state.cart.length;
 
             if (itemsInCart === 0) {
-                elements.emptyCartMessage.classList.remove('hidden');
-                elements.confirmOrderBtn.disabled = true;
-                elements.cartTotal.textContent = 'Gs. 0';
+                ELEMENTS.emptyCartMessage.classList.remove('hidden');
+                ELEMENTS.confirmOrderBtn.disabled = true;
+                ELEMENTS.cartTotal.textContent = 'Gs. 0';
                 return;
             } else {
-                elements.emptyCartMessage.classList.add('hidden');
+                ELEMENTS.emptyCartMessage.classList.add('hidden');
             }
 
             state.cart.forEach(item => {
@@ -259,7 +395,6 @@
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-white rounded-lg border';
                 
-                // Info Section
                 const infoSection = document.createElement('div');
                 infoSection.className = 'flex-grow mb-2 sm:mb-0';
                 infoSection.innerHTML = `
@@ -268,11 +403,9 @@
                     <p class="text-sm font-medium text-blue-600">Precio c/u: Gs. ${item.price.toLocaleString('es-ES')}</p>
                 `;
 
-                // Controls Section
                 const controlsSection = document.createElement('div');
                 controlsSection.className = 'flex items-center space-x-4 flex-shrink-0';
                 
-                // Quantity Control
                 const qtyControl = document.createElement('div');
                 qtyControl.className = 'qty-control flex items-center border rounded-lg';
                 qtyControl.innerHTML = `
@@ -281,9 +414,8 @@
                     <button type="button" data-action="increment" data-id="${item.id}" class="rounded-r-lg hover:bg-gray-300">+</button>
                 `;
                 
-                // Item Total
                 const totalSpan = document.createElement('span');
-                totalSpan.className = 'font-bold text-lg text-green-600 w-24 text-right flex-shrink-0';
+                totalSpan.className = 'font-bold text-lg text-emerald-500 w-24 text-right flex-shrink-0';
                 totalSpan.textContent = `Gs. ${itemTotal.toLocaleString('es-ES')}`;
 
                 controlsSection.appendChild(qtyControl);
@@ -292,12 +424,12 @@
                 itemDiv.appendChild(infoSection);
                 itemDiv.appendChild(controlsSection);
                 
-                elements.cartItemDetails.appendChild(itemDiv);
+                ELEMENTS.cartItemDetails.appendChild(itemDiv);
             });
 
-            elements.cartTotal.textContent = `Gs. ${total.toLocaleString('es-ES')}`;
-
-            // Adjuntar listener para control de cantidad
+            ELEMENTS.cartTotal.textContent = `Gs. ${total.toLocaleString('es-ES')}`;
+            
+            // Re-bind listeners for new buttons
             document.querySelectorAll('.qty-control button').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const productId = parseInt(e.target.dataset.id);
@@ -311,7 +443,7 @@
                         newQty += 1;
                     } else if (action === 'decrement') {
                         newQty -= 1;
-                        if (newQty < 0) newQty = 0; // Evitar negativos
+                        if (newQty < 0) newQty = 0;
                     }
 
                     updateCartQuantity(productId, newQty);
@@ -322,11 +454,11 @@
         }
 
         function checkOrderValidity() {
+            if (!ELEMENTS || !ELEMENTS.confirmOrderBtn) return;
             let isValid = state.cart.length > 0;
             let needsMinQtyAlert = false;
             
             state.cart.forEach(item => {
-                // Regla: Productos NO de Alquiler deben ser >= 3
                 if (!item.isRental && item.quantity < 3) {
                     isValid = false;
                     needsMinQtyAlert = true;
@@ -334,71 +466,53 @@
             });
 
             if (needsMinQtyAlert) {
-                elements.minQtyAlert.classList.remove('hidden');
-                // Deshabilitar botón de confirmar si hay problemas de cantidad O si la DB no está lista
-                elements.confirmOrderBtn.disabled = true; 
+                ELEMENTS.minQtyAlert.classList.remove('hidden');
+                ELEMENTS.confirmOrderBtn.disabled = true; 
             } else {
-                elements.minQtyAlert.classList.add('hidden');
-                 // Habilitar si el carrito no está vacío, cumple con la cantidad mínima Y la DB está lista
-                elements.confirmOrderBtn.disabled = !isValid || !elements.clientForm.checkValidity() || !window.dbReady;
-            }
-           
-            // Mensaje si no hay conexión a DB
-            if (!window.dbReady) {
-                 elements.orderStatus.textContent = "⚠️ No hay conexión para enviar pedidos. Por favor, recarga o revisa tu conexión a Internet.";
-                 elements.orderStatus.classList.remove('hidden');
-                 elements.orderStatus.classList.add('text-red-600');
-            } else if (isValid && window.dbReady) {
-                 elements.orderStatus.classList.add('hidden');
+                ELEMENTS.minQtyAlert.classList.add('hidden');
+                ELEMENTS.confirmOrderBtn.disabled = !isValid || !ELEMENTS.clientForm.checkValidity();
             }
         }
 
-        // --- FUNCIONES DE RENDERIZADO DEL CATÁLOGO ---
-
+        // --- LÓGICA DE RENDERIZADO (Igual) ---
         function createProductItem(product) {
             const item = document.createElement('div');
             const isRental = product.isRental;
             const minQty = product.min;
             const itemInCart = state.cart.find(i => i.id === product.id);
 
-            item.className = 'product-item p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between bg-white rounded-lg border-2 ' + (isRental ? 'border-green-300' : 'border-gray-100');
+            item.className = 'product-item p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between bg-white rounded-xl border-4 ' + (isRental ? 'border-emerald-500' : 'border-gray-100 shadow-md');
             
-            // Sección Izquierda (Logo e Info)
             const leftSection = document.createElement('div');
             leftSection.className = 'flex items-start space-x-4 sm:space-x-6 w-full sm:w-2/3 mb-3 sm:mb-0';
 
-            // Logo Placeholder
             const logo = document.createElement('div');
             logo.className = 'logo-placeholder shadow-lg flex-shrink-0';
             logo.style.backgroundColor = product.logoColor;
             logo.textContent = product.logoText;
             
-            // Info del Producto
             const info = document.createElement('div');
             info.innerHTML = `
-                <p class="text-lg font-bold text-gray-900">${product.name}</p>
+                <p class="text-lg font-extrabold text-gray-900">${product.name}</p>
                 <p class="text-sm text-gray-500 font-medium mt-0.5">
-                    ${product.presentation} | <span class="font-semibold text-xs ${isRental ? 'text-red-600' : 'text-blue-600'}">
+                    ${product.presentation} | <span class="font-bold text-xs ${isRental ? 'text-red-600' : 'text-blue-600'}">
                         ${isRental ? 'Alquiler/Evento' : `Mayorista (Mínimo ${minQty})`}
                     </span>
-                    ${itemInCart ? `<span class="text-sm font-extrabold text-green-600 ml-2">(En carrito: ${itemInCart.quantity})</span>` : ''}
+                    ${itemInCart ? `<span class="text-sm font-extrabold text-emerald-500 ml-2">(En carrito: ${itemInCart.quantity})</span>` : ''}
                 </p>
             `;
 
             leftSection.appendChild(logo);
             leftSection.appendChild(info);
 
-            // Sección Derecha (Interacción)
             const rightSection = document.createElement('div');
             rightSection.className = 'flex flex-col items-end space-y-2 w-full sm:w-1/3 justify-end';
 
-            // Precio
-            const priceSpan = `<span class="price-badge ${isRental ? 'bg-red-500 text-white' : 'bg-yellow-400 text-gray-900'}">Gs. ${product.price.toLocaleString('es-ES')}</span>`;
+            const priceSpan = `<span class="price-badge ${isRental ? 'bg-red-600 text-white' : 'bg-amber-400 text-gray-900'} shadow-md">Gs. ${product.price.toLocaleString('es-ES')}</span>`;
             rightSection.innerHTML += priceSpan;
 
-            // Botón Agregar
             const addButton = document.createElement('button');
-            addButton.className = 'add-to-cart-btn w-32 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-sm transition duration-150 shadow';
+            addButton.className = 'add-to-cart-btn w-32 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-sm transition duration-150 shadow-lg';
             addButton.textContent = `Agregar (${minQty} U.)`;
             addButton.dataset.id = product.id;
             addButton.addEventListener('click', (e) => {
@@ -414,7 +528,8 @@
         }
 
         function renderProducts(category) {
-            elements.productList.innerHTML = '';
+            if (!ELEMENTS || !ELEMENTS.productList) return;
+            ELEMENTS.productList.innerHTML = '';
             
             const filteredProducts = PRODUCTS.filter(product => 
                 category === 'Todos' || product.category === category
@@ -425,7 +540,7 @@
             });
 
             if (filteredProducts.length === 0) {
-                elements.productList.innerHTML = `<p class="text-center text-gray-500 py-12 text-lg">No se encontraron productos en la categoría "${category}".</p>`;
+                ELEMENTS.productList.innerHTML = `<p class="text-center text-gray-500 py-12 text-lg">No se encontraron productos en la categoría "${category}".</p>`;
                 return;
             }
 
@@ -436,9 +551,9 @@
                 if (category === 'Todos' && product.category !== currentCategoryTitle) {
                     currentCategoryTitle = product.category;
                     const catTitle = document.createElement('h2');
-                    catTitle.className = 'text-2xl font-extrabold text-blue-900 mt-8 mb-4 pb-2 border-b-4 border-blue-500';
+                    catTitle.className = 'text-3xl font-extrabold text-blue-900 mt-10 mb-5 pb-2 border-b-4 border-amber-400';
                     catTitle.textContent = product.category.toUpperCase();
-                    elements.productList.appendChild(catTitle);
+                    ELEMENTS.productList.appendChild(catTitle);
                     currentBrandTitle = ''; 
                 }
 
@@ -447,10 +562,10 @@
                     const brandTitle = document.createElement('div');
                     brandTitle.className = 'brand-title';
                     brandTitle.textContent = `MARCA: ${product.brand}`;
-                    elements.productList.appendChild(brandTitle);
+                    ELEMENTS.productList.appendChild(brandTitle);
                 }
 
-                elements.productList.appendChild(createProductItem(product));
+                ELEMENTS.productList.appendChild(createProductItem(product));
             });
 
             document.querySelectorAll('.filter-button').forEach(btn => {
@@ -463,7 +578,8 @@
         }
 
         function setupFilters() {
-            elements.filterContainer.innerHTML = '';
+            if (!ELEMENTS || !ELEMENTS.filterContainer) return;
+            ELEMENTS.filterContainer.innerHTML = '';
             categories.forEach(cat => {
                 const button = document.createElement('button');
                 button.className = 'filter-button bg-gray-200 text-gray-700 hover:bg-gray-300 py-2 px-4 rounded-full text-sm shadow-md transition duration-200';
@@ -472,337 +588,141 @@
                     state.currentFilter = cat;
                     renderProducts(cat);
                 });
-                elements.filterContainer.appendChild(button);
+                ELEMENTS.filterContainer.appendChild(button);
             });
             state.currentFilter = 'Todos';
             renderProducts(state.currentFilter);
         }
-        
-        // --- ENVÍO DE ORDEN (FIREBASE) ---
+
+        // --- FUNCIÓN DE ENVÍO DE ORDEN A WHATSAPP ---
+        function generateWhatsAppMessage(clientName, clientPhone, clientAddress, total) {
+            let message = `*✅ NUEVO PEDIDO MAYORISTA - MULTIGESTIONES PY ✅*\n\n`;
+            message += `*CLIENTE:* ${clientName}\n`;
+            message += `*TELÉFONO:* ${clientPhone}\n`;
+            message += `*DIRECCIÓN:* ${clientAddress}\n\n`;
+            message += `--- DETALLE DE LA ORDEN ---\n`;
+
+            state.cart.forEach(item => {
+                const type = item.isRental ? 'Alquiler' : 'Mayorista';
+                const subtotal = item.price * item.quantity;
+                message += `*• ${item.name} (${item.brand})*\n`;
+                message += `  - Cantidad: ${item.quantity} U.\n`;
+                message += `  - Tipo: ${type}\n`;
+                message += `  - Subtotal: Gs. ${subtotal.toLocaleString('es-ES')}\n`;
+            });
+
+            message += `\n*TOTAL FINAL A PAGAR:* Gs. ${total.toLocaleString('es-ES')}\n`;
+            message += `\n(Enviado desde el catálogo web)`;
+
+            return encodeURIComponent(message);
+        }
 
         async function submitOrder(e) {
             e.preventDefault();
 
-            if (state.cart.length === 0) {
-                console.error("El carrito está vacío. No se puede enviar la orden.");
-                return;
-            }
-            // Verificar si la DB está lista antes de intentar enviar
-            if (!window.dbReady || !window.db || !window.auth.currentUser) {
-                elements.orderStatus.textContent = "Error: Conexión con la base de datos no disponible. Intenta recargar.";
-                elements.orderStatus.classList.remove('hidden');
-                elements.orderStatus.classList.add('text-red-600');
-                return;
-            }
+            if (state.cart.length === 0) return;
+            checkOrderValidity();
 
-            elements.confirmOrderBtn.disabled = true;
-            elements.btnText.textContent = "Enviando...";
-            elements.orderStatus.classList.add('hidden');
+            ELEMENTS.confirmOrderBtn.disabled = true;
+            ELEMENTS.btnText.textContent = "Generando Enlace...";
 
             const total = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             
-            const clientInfo = {
-                name: elements.clientForm['client-name'].value,
-                phone: elements.clientForm['client-phone'].value,
-                address: elements.clientForm['client-address'].value,
-                userId: window.auth.currentUser.uid,
-            };
+            const clientName = ELEMENTS.clientForm['client-name'].value;
+            const clientPhone = ELEMENTS.clientForm['client-phone'].value;
+            const clientAddress = ELEMENTS.clientForm['client-address'].value;
 
-            // Mapear los items para guardar solo la información esencial
-            const simplifiedItems = state.cart.map(item => ({
-                id: item.id,
-                name: item.name,
-                brand: item.brand,
-                quantity: item.quantity,
-                price: item.price,
-                subtotal: item.quantity * item.price,
-                isRental: item.isRental,
-            }));
+            const whatsappMessage = generateWhatsAppMessage(clientName, clientPhone, clientAddress, total);
+            
+            const whatsappUrl = `https://api.whatsapp.com/send?phone=${BUSINESS_PHONE_NUMBER}&text=${whatsappMessage}`;
+            
+            window.open(whatsappUrl, '_blank');
 
+            ELEMENTS.confirmationModal.classList.remove('hidden');
 
-            const orderData = {
-                clientInfo: clientInfo,
-                items: simplifiedItems,
-                totalAmount: total,
-                status: 'PENDIENTE',
-                timestamp: window.firebaseExports.serverTimestamp(),
-                appId: appId,
-            };
-
-            const db = window.db;
-            const { addDoc, collection } = window.firebaseExports;
-            // Guardar en la colección pública de órdenes
-            const collectionPath = `/artifacts/${appId}/public/data/orders`;
-
-            try {
-                await addDoc(collection(db, collectionPath), orderData);
-                
-                // Mostrar modal de éxito
-                elements.confirmationModal.classList.remove('hidden');
-
-                // Limpiar carrito
-                state.cart = [];
-                localStorage.removeItem('multigestiones_cart');
-
-            } catch (error) {
-                console.error("Error al guardar la orden en Firestore:", error);
-                elements.orderStatus.textContent = "Error al enviar el pedido. Intenta nuevamente.";
-                elements.orderStatus.classList.remove('hidden');
-                elements.orderStatus.classList.add('text-red-600');
-                elements.confirmOrderBtn.disabled = false;
-                elements.btnText.textContent = "CONFIRMAR PEDIDO Y ENVIAR";
-            }
+            state.cart = [];
+            localStorage.removeItem('multigestiones_cart');
         }
 
-        // --- MANEJO DE VISTAS Y EVENTOS ---
+        // --- MANEJO DE VISTAS Y EVENTOS (Igual) ---
 
         function setupEventListeners() {
-            elements.viewCartBtn.addEventListener('click', () => {
-                elements.catalogView.classList.add('hidden');
-                elements.cartView.classList.remove('hidden');
+            if (!ELEMENTS || !ELEMENTS.viewCartBtn) return; 
+
+            ELEMENTS.viewCartBtn.addEventListener('click', () => {
+                ELEMENTS.catalogView.classList.add('hidden');
+                ELEMENTS.cartView.classList.remove('hidden');
                 renderCartSummary();
             });
 
-            elements.backToCatalogBtn.addEventListener('click', () => {
-                elements.cartView.classList.add('hidden');
-                elements.catalogView.classList.remove('hidden');
+            ELEMENTS.backToCatalogBtn.addEventListener('click', () => {
+                ELEMENTS.cartView.classList.add('hidden');
+                ELEMENTS.catalogView.classList.remove('hidden');
                 renderProducts(state.currentFilter);
             });
 
-            elements.clientForm.addEventListener('submit', submitOrder);
+            ELEMENTS.clientForm.addEventListener('submit', submitOrder);
             
-            elements.clientForm.addEventListener('input', checkOrderValidity);
+            ELEMENTS.clientForm.addEventListener('input', checkOrderValidity);
 
-            elements.closeModalBtn.addEventListener('click', () => {
-                elements.confirmationModal.classList.add('hidden');
-                elements.cartView.classList.add('hidden');
-                elements.catalogView.classList.remove('hidden');
-                elements.btnText.textContent = "CONFIRMAR PEDIDO Y ENVIAR";
+            ELEMENTS.closeModalBtn.addEventListener('click', () => {
+                ELEMENTS.confirmationModal.classList.add('hidden');
+                ELEMENTS.cartView.classList.add('hidden');
+                ELEMENTS.catalogView.classList.remove('hidden');
+                ELEMENTS.btnText.textContent = "CONFIRMAR PEDIDO Y ENVIAR";
                 updateCartUI();
                 renderProducts('Todos');
             });
-        }
+            
+            // Lógica para el botón de "Subir Arriba"
+            ELEMENTS.scrollToTopBtn.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
 
-        // --- INICIALIZACIÓN PRINCIPAL ---
-        window.mainApp = {
-            init: () => {
-                elements.loadingIndicator.classList.add('hidden');
-                setupFilters();
-                setupEventListeners();
-                updateCartUI();
-                // Mostrar alerta si la DB no está lista (modo offline)
-                if (!window.dbReady) {
-                    elements.orderStatus.textContent = "⚠️ No hay conexión para enviar pedidos. Solo se puede navegar. Por favor, recarga.";
-                    elements.orderStatus.classList.remove('hidden');
-                    elements.orderStatus.classList.add('text-red-600');
-                    elements.confirmOrderBtn.disabled = true; // Deshabilitar el botón de envío
+            window.addEventListener('scroll', () => {
+                if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
+                    ELEMENTS.scrollToTopBtn.classList.remove('hidden');
+                } else {
+                    ELEMENTS.scrollToTopBtn.classList.add('hidden');
                 }
-            }
-        };
+            });
+        }
 
-        // Iniciar el proceso de autenticación y carga de la aplicación
-        authenticate();
-        
-        // Fallback: Si la conexión tarda mucho (5 segundos), carga la aplicación de todos modos.
-        setTimeout(() => {
-            if (elements.loadingIndicator.classList.contains('hidden')) return;
-            console.warn("Conexión tardía. Forzando la carga de la aplicación en modo offline.");
-            window.dbReady = false;
-            window.mainApp.init(); 
-        }, 5000); // 5 segundos de espera máxima
+        // --- INICIALIZACIÓN PRINCIPAL (Al final del body) ---
+        function initApp() {
+            // Se definen ELEMENTS aquí, después de que todo el HTML se ha cargado.
+            ELEMENTS = {
+                productList: document.getElementById('product-list'),
+                filterContainer: document.getElementById('filter-container'),
+                cartCount: document.getElementById('cart-count'),
+                cartView: document.getElementById('cart-view'),
+                catalogView: document.getElementById('catalog-view'),
+                viewCartBtn: document.getElementById('view-cart-btn'),
+                backToCatalogBtn: document.getElementById('back-to-catalog-btn'),
+                cartItemDetails: document.getElementById('cart-item-details'),
+                cartTotal: document.getElementById('cart-total'),
+                emptyCartMessage: document.getElementById('empty-cart-message'),
+                clientForm: document.getElementById('client-form'),
+                confirmOrderBtn: document.getElementById('confirm-order-btn'),
+                orderStatus: document.getElementById('order-status'),
+                confirmationModal: document.getElementById('confirmation-modal'),
+                closeModalBtn: document.getElementById('close-modal-btn'),
+                minQtyAlert: document.getElementById('min-qty-alert'),
+                loadingIndicator: document.getElementById('loading-indicator'),
+                btnText: document.getElementById('btn-text'),
+                scrollToTopBtn: document.getElementById('scroll-to-top-btn'), 
+            };
 
+            // Ejecución de la aplicación
+            setupFilters();
+            setupEventListeners();
+            updateCartUI();
+        }
+
+        // Asegurarse de que la aplicación se inicie.
+        // Como el script está al final del <body>, el DOM ya debería estar listo.
+        initApp();
     </script>
-    <style>
-        :root {
-            font-family: 'Inter', sans-serif;
-        }
-        body {
-            background-color: #e0e7ff;
-            padding: 1rem;
-        }
-        .card {
-            background-color: #ffffff;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        .header {
-            background-color: #1a202c;
-            color: white;
-            padding: 2.5rem 1.5rem 1.5rem;
-            text-align: center;
-        }
-        .brand-title {
-            background-color: #bfdbfe;
-            color: #1e3a8a;
-            padding: 8px 16px;
-            border-radius: 8px;
-            margin-top: 10px;
-            margin-bottom: 5px;
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 0.9rem;
-        }
-        .price-badge {
-            background-color: #f59e0b;
-            color: #000000;
-            font-weight: 800;
-            padding: 0.4rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-            display: inline-block;
-        }
-        .logo-placeholder {
-            width: 56px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 700;
-            color: white;
-            border-radius: 12px;
-            text-align: center;
-            line-height: 1.2;
-            padding: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            flex-shrink: 0;
-        }
-        .filter-button.active {
-            background-color: #3b82f6;
-            color: white;
-            font-weight: 600;
-            border-color: #1d4ed8;
-        }
-        .cart-item-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .qty-control button {
-            background-color: #e5e7eb;
-            width: 30px;
-            height: 30px;
-            font-size: 1.2rem;
-            line-height: 1;
-            padding: 0;
-            transition: background-color 0.1s;
-        }
-        .qty-control button:hover {
-            background-color: #d1d5db;
-        }
-        .qty-control input {
-            width: 40px;
-            text-align: center;
-            font-weight: bold;
-            border: none;
-            padding: 0;
-            margin: 0 2px;
-            height: 30px;
-        }
-    </style>
-</head>
-<body>
-
-    <div class="max-w-4xl mx-auto card mt-4 mb-16">
-
-        <!-- Header y Contacto -->
-        <header class="header">
-            <h1 class="text-4xl font-extrabold mb-1 tracking-wider">SISTEMA DE PEDIDOS MAYORISTAS</h1>
-            <p class="text-xl font-light opacity-90 mb-4">MULTIGESTIONES PY</p>
-            <p class="text-lg font-medium bg-red-700 text-white p-2 rounded-lg">
-                🚨 Venta Mínima 3 Unidades por Artículo (Abarrotes/Snacks) 🚨
-            </p>
-        </header>
-
-        <main class="p-4 sm:p-8">
-
-            <!-- VISTA DEL CATÁLOGO -->
-            <div id="catalog-view">
-                
-                <div class="flex justify-between items-center mb-6 border-b pb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">Catálogo de Productos</h2>
-                    <button id="view-cart-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-200 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                        Ver Carrito (<span id="cart-count">0</span>)
-                    </button>
-                </div>
-                
-                <!-- Filtros -->
-                <div class="mb-8">
-                    <div id="filter-container" class="flex flex-wrap gap-2 sm:gap-4">
-                        <!-- Botones de Categoría se insertarán aquí -->
-                    </div>
-                </div>
-
-                <!-- Lista de Productos -->
-                <div id="product-list" class="space-y-2">
-                    <!-- Los productos se insertarán aquí por JavaScript -->
-                </div>
-
-                <div id="loading-indicator" class="text-center py-10 text-xl text-gray-500">Conectando con la base de datos...</div>
-            </div>
-
-
-            <!-- VISTA DEL CARRITO Y FORMULARIO DE CONFIRMACIÓN -->
-            <div id="cart-view" class="hidden">
-                <button id="back-to-catalog-btn" class="text-blue-600 hover:text-blue-800 font-medium mb-6 flex items-center">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                    Volver al Catálogo
-                </button>
-
-                <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Resumen de Pedido</h2>
-
-                <div id="cart-summary" class="bg-gray-50 p-4 rounded-xl mb-6">
-                    <div id="cart-item-details" class="cart-item-list space-y-3 mb-4">
-                        <!-- Detalles del carrito aquí -->
-                        <p id="empty-cart-message" class="text-gray-500 text-center py-4">El carrito está vacío.</p>
-                    </div>
-
-                    <div class="flex justify-between items-center pt-3 border-t border-gray-200">
-                        <span class="text-xl font-bold text-gray-900">Total a Pagar (Gs.):</span>
-                        <span id="cart-total" class="text-2xl font-extrabold text-red-600">Gs. 0</span>
-                    </div>
-                    <p id="min-qty-alert" class="text-sm text-red-600 mt-2 font-medium hidden">⚠️ **ATENCIÓN:** Tienes artículos de Abarrotes con menos de 3 unidades. Por favor, ajusta las cantidades.</p>
-                </div>
-
-                <!-- Formulario de Cliente -->
-                <h3 class="text-2xl font-bold text-gray-800 mb-4">Datos del Cliente</h3>
-                <form id="client-form" class="space-y-4">
-                    <div>
-                        <label for="client-name" class="block text-sm font-medium text-gray-700">Nombre o Razón Social</label>
-                        <input type="text" id="client-name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
-                    </div>
-                    <div>
-                        <label for="client-phone" class="block text-sm font-medium text-gray-700">Teléfono / WhatsApp</label>
-                        <input type="text" id="client-phone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
-                    </div>
-                    <div>
-                        <label for="client-address" class="block text-sm font-medium text-gray-700">Dirección de Entrega</label>
-                        <textarea id="client-address" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"></textarea>
-                    </div>
-
-                    <button type="submit" id="confirm-order-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition duration-200 disabled:opacity-50" disabled>
-                        <span id="btn-text">CONFIRMAR PEDIDO Y ENVIAR</span>
-                    </button>
-                    <p id="order-status" class="text-center mt-3 font-medium hidden"></p>
-                </form>
-            </div>
-
-            <!-- MODAL DE CONFIRMACIÓN DE ENVÍO -->
-            <div id="confirmation-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
-                <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
-                    <svg class="w-16 h-16 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">¡Pedido Enviado con Éxito!</h3>
-                    <p class="text-gray-600 mb-6">Tu orden ha sido registrada. Pronto nos contactaremos al número proporcionado.</p>
-                    <button id="close-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
-                        Volver al inicio
-                    </button>
-                </div>
-            </div>
-
-        </main>
-    </div>
 </body>
 </html>
 
