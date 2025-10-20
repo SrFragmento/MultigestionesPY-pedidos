@@ -8,7 +8,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // Configuración Global de Firebase (MANDATORIA)
@@ -23,235 +23,75 @@
         
         setLogLevel('debug'); // Activar logs de Firebase
 
-        // Inicializar Firebase
-        if (firebaseConfig) {
-            window.app = initializeApp(firebaseConfig);
-            window.db = getFirestore(window.app);
-            window.auth = getAuth(window.app);
+        // Estado Global de la Aplicación
+        const state = {
+            cart: JSON.parse(localStorage.getItem('multigestiones_cart')) || [],
+            currentFilter: 'Todos',
+        };
 
-            // Función de autenticación (usando el token proporcionado o anónimamente)
-            const authenticate = async () => {
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(window.auth, initialAuthToken);
-                        console.log("Autenticación exitosa con token personalizado.");
-                    } else {
-                        await signInAnonymously(window.auth);
-                        console.log("Autenticación anónima exitosa.");
-                    }
-                    // Una vez autenticado, inicializa la app principal
-                    window.mainApp.init(); 
-                } catch (error) {
-                    console.error("Error de autenticación de Firebase:", error);
-                    // Sustituimos alert por un mensaje de consola
-                    console.error("Error al conectar con la base de datos. Por favor, recarga la página.");
+        const ELEMENTS = {
+            productList: document.getElementById('product-list'),
+            filterContainer: document.getElementById('filter-container'),
+            cartCount: document.getElementById('cart-count'),
+            cartView: document.getElementById('cart-view'),
+            catalogView: document.getElementById('catalog-view'),
+            viewCartBtn: document.getElementById('view-cart-btn'),
+            backToCatalogBtn: document.getElementById('back-to-catalog-btn'),
+            cartItemDetails: document.getElementById('cart-item-details'),
+            cartTotal: document.getElementById('cart-total'),
+            emptyCartMessage: document.getElementById('empty-cart-message'),
+            clientForm: document.getElementById('client-form'),
+            confirmOrderBtn: document.getElementById('confirm-order-btn'),
+            orderStatus: document.getElementById('order-status'),
+            confirmationModal: document.getElementById('confirmation-modal'),
+            closeModalBtn: document.getElementById('close-modal-btn'),
+            minQtyAlert: document.getElementById('min-qty-alert'),
+            loadingIndicator: document.getElementById('loading-indicator'),
+            btnText: document.getElementById('btn-text'),
+        };
+
+        // --- INICIALIZACIÓN DE FIREBASE Y AUTHENTICACIÓN ---
+
+        const authenticate = async () => {
+            if (!firebaseConfig) {
+                console.error("Configuración de Firebase no disponible. Saltando conexión.");
+                window.mainApp.init(); // Inicializar app sin DB
+                return;
+            }
+
+            try {
+                window.app = initializeApp(firebaseConfig);
+                window.db = getFirestore(window.app);
+                window.auth = getAuth(window.app);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(window.auth, initialAuthToken);
+                    console.log("Autenticación exitosa con token personalizado.");
+                } else {
+                    await signInAnonymously(window.auth);
+                    console.log("Autenticación anónima exitosa.");
                 }
-            };
-            authenticate();
-        } else {
-            console.error("Configuración de Firebase no disponible.");
-        }
+                
+                // Una vez autenticado, inicializa la app principal
+                window.mainApp.init(); 
+
+            } catch (error) {
+                console.error("Error de conexión o autenticación de Firebase:", error);
+                ELEMENTS.loadingIndicator.textContent = "Error de conexión. Recarga la página o verifica la consola.";
+            }
+        };
 
         // Exportar funciones esenciales para el código de la aplicación
         window.firebaseExports = {
             addDoc,
             collection,
             serverTimestamp,
+            getAuth,
+            onAuthStateChanged
         };
-    </script>
-    <style>
-        :root {
-            font-family: 'Inter', sans-serif;
-        }
-        body {
-            background-color: #e0e7ff;
-            padding: 1rem;
-        }
-        .card {
-            background-color: #ffffff;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        .header {
-            background-color: #1a202c;
-            color: white;
-            padding: 2.5rem 1.5rem 1.5rem;
-            text-align: center;
-        }
-        .brand-title {
-            background-color: #bfdbfe;
-            color: #1e3a8a;
-            padding: 8px 16px;
-            border-radius: 8px;
-            margin-top: 10px;
-            margin-bottom: 5px;
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 0.9rem;
-        }
-        .price-badge {
-            background-color: #f59e0b;
-            color: #000000;
-            font-weight: 800;
-            padding: 0.4rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-            display: inline-block;
-        }
-        .logo-placeholder {
-            width: 56px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 700;
-            color: white;
-            border-radius: 12px;
-            text-align: center;
-            line-height: 1.2;
-            padding: 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            flex-shrink: 0;
-        }
-        .filter-button.active {
-            background-color: #3b82f6;
-            color: white;
-            font-weight: 600;
-            border-color: #1d4ed8;
-        }
-        .cart-item-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .qty-control button {
-            background-color: #e5e7eb;
-            width: 30px;
-            height: 30px;
-            font-size: 1.2rem;
-            line-height: 1;
-            padding: 0;
-            transition: background-color 0.1s;
-        }
-        .qty-control button:hover {
-            background-color: #d1d5db;
-        }
-        .qty-control input {
-            width: 40px;
-            text-align: center;
-            font-weight: bold;
-            border: none;
-            padding: 0;
-            margin: 0 2px;
-            height: 30px;
-        }
-    </style>
-</head>
-<body>
 
-    <div class="max-w-4xl mx-auto card mt-4 mb-16">
+        // --- DEFINICIÓN DE PRODUCTOS Y LÓGICA DE LA APP (MISMO CÓDIGO) ---
 
-        <!-- Header y Contacto -->
-        <header class="header">
-            <h1 class="text-4xl font-extrabold mb-1 tracking-wider">SISTEMA DE PEDIDOS MAYORISTAS</h1>
-            <p class="text-xl font-light opacity-90 mb-4">MULTIGESTIONES PY</p>
-            <p class="text-lg font-medium bg-red-700 text-white p-2 rounded-lg">
-                🚨 Venta Mínima 3 Unidades por Artículo (Abarrotes/Snacks) 🚨
-            </p>
-        </header>
-
-        <main class="p-4 sm:p-8">
-
-            <!-- VISTA DEL CATÁLOGO -->
-            <div id="catalog-view">
-                
-                <div class="flex justify-between items-center mb-6 border-b pb-4">
-                    <h2 class="text-2xl font-bold text-gray-800">Catálogo de Productos</h2>
-                    <button id="view-cart-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-200 flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                        Ver Carrito (<span id="cart-count">0</span>)
-                    </button>
-                </div>
-                
-                <!-- Filtros -->
-                <div class="mb-8">
-                    <div id="filter-container" class="flex flex-wrap gap-2 sm:gap-4">
-                        <!-- Botones de Categoría se insertarán aquí -->
-                    </div>
-                </div>
-
-                <!-- Lista de Productos -->
-                <div id="product-list" class="space-y-2">
-                    <!-- Los productos se insertarán aquí por JavaScript -->
-                </div>
-
-                <div id="loading-indicator" class="text-center py-10 text-xl text-gray-500 hidden">Conectando con la base de datos...</div>
-            </div>
-
-
-            <!-- VISTA DEL CARRITO Y FORMULARIO DE CONFIRMACIÓN -->
-            <div id="cart-view" class="hidden">
-                <button id="back-to-catalog-btn" class="text-blue-600 hover:text-blue-800 font-medium mb-6 flex items-center">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                    Volver al Catálogo
-                </button>
-
-                <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Resumen de Pedido</h2>
-
-                <div id="cart-summary" class="bg-gray-50 p-4 rounded-xl mb-6">
-                    <div id="cart-item-details" class="cart-item-list space-y-3 mb-4">
-                        <!-- Detalles del carrito aquí -->
-                        <p id="empty-cart-message" class="text-gray-500 text-center py-4">El carrito está vacío.</p>
-                    </div>
-
-                    <div class="flex justify-between items-center pt-3 border-t border-gray-200">
-                        <span class="text-xl font-bold text-gray-900">Total a Pagar (Gs.):</span>
-                        <span id="cart-total" class="text-2xl font-extrabold text-red-600">Gs. 0</span>
-                    </div>
-                    <p id="min-qty-alert" class="text-sm text-red-600 mt-2 font-medium hidden">⚠️ **ATENCIÓN:** Tienes artículos de Abarrotes con menos de 3 unidades. Por favor, ajusta las cantidades.</p>
-                </div>
-
-                <!-- Formulario de Cliente -->
-                <h3 class="text-2xl font-bold text-gray-800 mb-4">Datos del Cliente</h3>
-                <form id="client-form" class="space-y-4">
-                    <div>
-                        <label for="client-name" class="block text-sm font-medium text-gray-700">Nombre o Razón Social</label>
-                        <input type="text" id="client-name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
-                    </div>
-                    <div>
-                        <label for="client-phone" class="block text-sm font-medium text-gray-700">Teléfono / WhatsApp</label>
-                        <input type="text" id="client-phone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
-                    </div>
-                    <div>
-                        <label for="client-address" class="block text-sm font-medium text-gray-700">Dirección de Entrega</label>
-                        <textarea id="client-address" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"></textarea>
-                    </div>
-
-                    <button type="submit" id="confirm-order-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition duration-200 disabled:opacity-50" disabled>
-                        <span id="btn-text">CONFIRMAR PEDIDO Y ENVIAR</span>
-                    </button>
-                    <p id="order-status" class="text-center mt-3 font-medium hidden"></p>
-                </form>
-            </div>
-
-            <!-- MODAL DE CONFIRMACIÓN DE ENVÍO -->
-            <div id="confirmation-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
-                <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
-                    <svg class="w-16 h-16 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">¡Pedido Enviado con Éxito!</h3>
-                    <p class="text-gray-600 mb-6">Tu orden ha sido registrada. Pronto nos contactaremos al número proporcionado.</p>
-                    <button id="close-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
-                        Volver al inicio
-                    </button>
-                </div>
-            </div>
-
-        </main>
-    </div>
-
-    <script>
         // Precios en Guaraníes (Gs.)
         const PRODUCTS = [
             // CATERORÍA DE ALQUILER PARA EVENTOS (Mínimo 1)
@@ -341,33 +181,6 @@
             { id: 72, name: "Bolsa de Basura Reforzada", brand: "Rey", presentation: "Pack x 10", price: 10000, category: "Limpieza", logoColor: "#1f2937", logoText: "Rey 👑", isRental: false, min: 3 },
             { id: 73, name: "Limpiador Desinfectante", brand: "Lysoform", presentation: "500ml", price: 9800, category: "Limpieza", logoColor: "#4f46e5", logoText: "Lysoform", isRental: false, min: 3 },
         ];
-
-        // Estado Global de la Aplicación
-        const state = {
-            cart: JSON.parse(localStorage.getItem('multigestiones_cart')) || [],
-            currentFilter: 'Todos',
-        };
-
-        const elements = {
-            productList: document.getElementById('product-list'),
-            filterContainer: document.getElementById('filter-container'),
-            cartCount: document.getElementById('cart-count'),
-            cartView: document.getElementById('cart-view'),
-            catalogView: document.getElementById('catalog-view'),
-            viewCartBtn: document.getElementById('view-cart-btn'),
-            backToCatalogBtn: document.getElementById('back-to-catalog-btn'),
-            cartItemDetails: document.getElementById('cart-item-details'),
-            cartTotal: document.getElementById('cart-total'),
-            emptyCartMessage: document.getElementById('empty-cart-message'),
-            clientForm: document.getElementById('client-form'),
-            confirmOrderBtn: document.getElementById('confirm-order-btn'),
-            orderStatus: document.getElementById('order-status'),
-            confirmationModal: document.getElementById('confirmation-modal'),
-            closeModalBtn: document.getElementById('close-modal-btn'),
-            minQtyAlert: document.getElementById('min-qty-alert'),
-            loadingIndicator: document.getElementById('loading-indicator'),
-            btnText: document.getElementById('btn-text'),
-        };
 
         const allCategories = PRODUCTS.map(p => p.category);
         const categories = [...new Set(allCategories)];
@@ -703,13 +516,13 @@
                 totalAmount: total,
                 status: 'PENDIENTE',
                 timestamp: window.firebaseExports.serverTimestamp(),
-                appId: typeof __app_id !== 'undefined' ? __app_id : 'default-app-id',
+                appId: appId,
             };
 
             const db = window.db;
             const { addDoc, collection } = window.firebaseExports;
             // Guardar en la colección pública de órdenes
-            const collectionPath = `/artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/public/data/orders`;
+            const collectionPath = `/artifacts/${appId}/public/data/orders`;
 
             try {
                 await addDoc(collection(db, collectionPath), orderData);
@@ -770,9 +583,200 @@
             }
         };
 
-        // Mostrar indicador de carga mientras espera Firebase
-        elements.loadingIndicator.classList.remove('hidden');
+        // Iniciar el proceso de autenticación y carga de la aplicación
+        authenticate();
     </script>
+    <style>
+        :root {
+            font-family: 'Inter', sans-serif;
+        }
+        body {
+            background-color: #e0e7ff;
+            padding: 1rem;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #1a202c;
+            color: white;
+            padding: 2.5rem 1.5rem 1.5rem;
+            text-align: center;
+        }
+        .brand-title {
+            background-color: #bfdbfe;
+            color: #1e3a8a;
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+        .price-badge {
+            background-color: #f59e0b;
+            color: #000000;
+            font-weight: 800;
+            padding: 0.4rem 0.8rem;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            display: inline-block;
+        }
+        .logo-placeholder {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            border-radius: 12px;
+            text-align: center;
+            line-height: 1.2;
+            padding: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
+        }
+        .filter-button.active {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: 600;
+            border-color: #1d4ed8;
+        }
+        .cart-item-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .qty-control button {
+            background-color: #e5e7eb;
+            width: 30px;
+            height: 30px;
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 0;
+            transition: background-color 0.1s;
+        }
+        .qty-control button:hover {
+            background-color: #d1d5db;
+        }
+        .qty-control input {
+            width: 40px;
+            text-align: center;
+            font-weight: bold;
+            border: none;
+            padding: 0;
+            margin: 0 2px;
+            height: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="max-w-4xl mx-auto card mt-4 mb-16">
+
+        <!-- Header y Contacto -->
+        <header class="header">
+            <h1 class="text-4xl font-extrabold mb-1 tracking-wider">SISTEMA DE PEDIDOS MAYORISTAS</h1>
+            <p class="text-xl font-light opacity-90 mb-4">MULTIGESTIONES PY</p>
+            <p class="text-lg font-medium bg-red-700 text-white p-2 rounded-lg">
+                🚨 Venta Mínima 3 Unidades por Artículo (Abarrotes/Snacks) 🚨
+            </p>
+        </header>
+
+        <main class="p-4 sm:p-8">
+
+            <!-- VISTA DEL CATÁLOGO -->
+            <div id="catalog-view">
+                
+                <div class="flex justify-between items-center mb-6 border-b pb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Catálogo de Productos</h2>
+                    <button id="view-cart-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-200 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        Ver Carrito (<span id="cart-count">0</span>)
+                    </button>
+                </div>
+                
+                <!-- Filtros -->
+                <div class="mb-8">
+                    <div id="filter-container" class="flex flex-wrap gap-2 sm:gap-4">
+                        <!-- Botones de Categoría se insertarán aquí -->
+                    </div>
+                </div>
+
+                <!-- Lista de Productos -->
+                <div id="product-list" class="space-y-2">
+                    <!-- Los productos se insertarán aquí por JavaScript -->
+                </div>
+
+                <div id="loading-indicator" class="text-center py-10 text-xl text-gray-500">Conectando con la base de datos...</div>
+            </div>
+
+
+            <!-- VISTA DEL CARRITO Y FORMULARIO DE CONFIRMACIÓN -->
+            <div id="cart-view" class="hidden">
+                <button id="back-to-catalog-btn" class="text-blue-600 hover:text-blue-800 font-medium mb-6 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Volver al Catálogo
+                </button>
+
+                <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Resumen de Pedido</h2>
+
+                <div id="cart-summary" class="bg-gray-50 p-4 rounded-xl mb-6">
+                    <div id="cart-item-details" class="cart-item-list space-y-3 mb-4">
+                        <!-- Detalles del carrito aquí -->
+                        <p id="empty-cart-message" class="text-gray-500 text-center py-4">El carrito está vacío.</p>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-3 border-t border-gray-200">
+                        <span class="text-xl font-bold text-gray-900">Total a Pagar (Gs.):</span>
+                        <span id="cart-total" class="text-2xl font-extrabold text-red-600">Gs. 0</span>
+                    </div>
+                    <p id="min-qty-alert" class="text-sm text-red-600 mt-2 font-medium hidden">⚠️ **ATENCIÓN:** Tienes artículos de Abarrotes con menos de 3 unidades. Por favor, ajusta las cantidades.</p>
+                </div>
+
+                <!-- Formulario de Cliente -->
+                <h3 class="text-2xl font-bold text-gray-800 mb-4">Datos del Cliente</h3>
+                <form id="client-form" class="space-y-4">
+                    <div>
+                        <label for="client-name" class="block text-sm font-medium text-gray-700">Nombre o Razón Social</label>
+                        <input type="text" id="client-name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                    </div>
+                    <div>
+                        <label for="client-phone" class="block text-sm font-medium text-gray-700">Teléfono / WhatsApp</label>
+                        <input type="text" id="client-phone" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                    </div>
+                    <div>
+                        <label for="client-address" class="block text-sm font-medium text-gray-700">Dirección de Entrega</label>
+                        <textarea id="client-address" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"></textarea>
+                    </div>
+
+                    <button type="submit" id="confirm-order-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition duration-200 disabled:opacity-50" disabled>
+                        <span id="btn-text">CONFIRMAR PEDIDO Y ENVIAR</span>
+                    </button>
+                    <p id="order-status" class="text-center mt-3 font-medium hidden"></p>
+                </form>
+            </div>
+
+            <!-- MODAL DE CONFIRMACIÓN DE ENVÍO -->
+            <div id="confirmation-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50">
+                <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center">
+                    <svg class="w-16 h-16 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">¡Pedido Enviado con Éxito!</h3>
+                    <p class="text-gray-600 mb-6">Tu orden ha sido registrada. Pronto nos contactaremos al número proporcionado.</p>
+                    <button id="close-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        Volver al inicio
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
 </body>
 </html>
 
