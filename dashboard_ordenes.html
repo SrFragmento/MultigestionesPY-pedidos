@@ -1,1 +1,233 @@
-&lt;!DOCTYPE html&gt;<br/>&lt;html lang=&quot;es&quot;&gt;<br/>&lt;head&gt;<br/>    &lt;meta charset=&quot;UTF-8&quot;&gt;<br/>    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;<br/>    &lt;title&gt;Dashboard de Órdenes - Multigestiones PY&lt;/title&gt;<br/>    &lt;script src=&quot;https://cdn.tailwindcss.com&quot;&gt;&lt;/script&gt;<br/>    &lt;!-- Firebase SDKs --&gt;<br/>    &lt;script type=&quot;module&quot;&gt;<br/>        import { initializeApp } from &quot;https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js&quot;;<br/>        import { getAuth, signInAnonymously, signInWithCustomToken } from &quot;https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js&quot;;<br/>        import { getFirestore, collection, onSnapshot, setLogLevel, doc, updateDoc } from &quot;https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js&quot;;<br/>        <br/>        // Configuración Global de Firebase (MANDATORIA)<br/>        const appId = typeof __app_id !== &#39;undefined&#39; ? __app_id : &#39;default-app-id&#39;;<br/>        const firebaseConfig = typeof __firebase_config !== &#39;undefined&#39; ? JSON.parse(__firebase_config) : null;<br/>        const initialAuthToken = typeof __initial_auth_token !== &#39;undefined&#39; ? __initial_auth_token : null;<div></div>        window.app = null;<br/>        window.db = null;<br/>        window.auth = null;<br/>        <br/>        setLogLevel(&#39;debug&#39;); <div></div>        if (firebaseConfig) {<br/>            window.app = initializeApp(firebaseConfig);<br/>            window.db = getFirestore(window.app);<br/>            window.auth = getAuth(window.app);<div></div>            const authenticate = async () =&gt; {<br/>                try {<br/>                    if (initialAuthToken) {<br/>                        await signInWithCustomToken(window.auth, initialAuthToken);<br/>                        console.log(&quot;Admin: Autenticación exitosa con token personalizado.&quot;);<br/>                    } else {<br/>                        await signInAnonymously(window.auth);<br/>                        console.log(&quot;Admin: Autenticación anónima exitosa.&quot;);<br/>                    }<br/>                    window.mainApp.init(); <br/>                } catch (error) {<br/>                    console.error(&quot;Error de autenticación de Firebase:&quot;, error);<br/>                    document.getElementById(&#39;order-list&#39;).innerHTML = &#39;&lt;p class=&quot;text-red-500 font-bold&quot;&gt;Error de conexión con la base de datos.&lt;/p&gt;&#39;;<br/>                }<br/>            };<br/>            authenticate();<br/>        } else {<br/>            document.getElementById(&#39;order-list&#39;).innerHTML = &#39;&lt;p class=&quot;text-red-500 font-bold&quot;&gt;Configuración de Firebase no disponible.&lt;/p&gt;&#39;;<br/>        }<div></div>        window.firebaseExports = {<br/>            onSnapshot,<br/>            collection,<br/>            doc,<br/>            updateDoc<br/>        };<br/>    &lt;/script&gt;<br/>    &lt;style&gt;<br/>        :root {<br/>            font-family: &#39;Inter&#39;, sans-serif;<br/>        }<br/>        body {<br/>            background-color: #f7f9fd;<br/>            padding: 1rem;<br/>        }<br/>        .dashboard-card {<br/>            background-color: #ffffff;<br/>            border-radius: 20px;<br/>            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);<br/>            overflow: hidden;<br/>            padding: 2rem;<br/>        }<br/>        .order-status-badge {<br/>            font-weight: 700;<br/>            padding: 4px 10px;<br/>            border-radius: 9999px;<br/>            font-size: 0.8rem;<br/>            display: inline-block;<br/>        }<br/>        .PENDIENTE { background-color: #fcd34d; color: #92400e; }<br/>        .EN_PROCESO { background-color: #60a5fa; color: #1e40af; }<br/>        .ENTREGADO { background-color: #34d399; color: #065f46; }<br/>        .order-item-list {<br/>            max-height: 200px;<br/>            overflow-y: auto;<br/>            border: 1px solid #e5e7eb;<br/>            padding: 10px;<br/>            border-radius: 8px;<br/>        }<br/>    &lt;/style&gt;<br/>&lt;/head&gt;<br/>&lt;body&gt;<div></div>    &lt;div class=&quot;max-w-6xl mx-auto mt-4 mb-16 dashboard-card&quot;&gt;<div></div>        &lt;header class=&quot;mb-8 border-b pb-4&quot;&gt;<br/>            &lt;h1 class=&quot;text-3xl font-extrabold text-gray-900&quot;&gt;ADMINISTRACIÓN DE PEDIDOS&lt;/h1&gt;<br/>            &lt;p class=&quot;text-gray-500&quot;&gt;Multigestiones PY - Órdenes recibidas en tiempo real.&lt;/p&gt;<br/>        &lt;/header&gt;<div></div>        &lt;section id=&quot;main-content&quot;&gt;<br/>            &lt;h2 class=&quot;text-2xl font-bold text-gray-800 mb-4&quot;&gt;Lista de Órdenes&lt;/h2&gt;<br/>            &lt;div id=&quot;loading-indicator&quot; class=&quot;text-center py-10 text-xl text-gray-500&quot;&gt;Cargando órdenes...&lt;/div&gt;<br/>            &lt;div id=&quot;order-list&quot; class=&quot;space-y-6&quot;&gt;<br/>                &lt;!-- Órdenes cargadas aquí por JS --&gt;<br/>            &lt;/div&gt;<br/>            &lt;p id=&quot;no-orders&quot; class=&quot;text-center text-gray-500 py-10 text-lg hidden&quot;&gt;No hay órdenes pendientes en este momento.&lt;/p&gt;<br/>        &lt;/section&gt;<div></div>    &lt;/div&gt;<div></div>    &lt;script&gt;<br/>        const elements = {<br/>            orderList: document.getElementById(&#39;order-list&#39;),<br/>            loadingIndicator: document.getElementById(&#39;loading-indicator&#39;),<br/>            noOrders: document.getElementById(&#39;no-orders&#39;),<br/>        };<div></div>        const APP_ID = typeof __app_id !== &#39;undefined&#39; ? __app_id : &#39;default-app-id&#39;;<div></div>        /**<br/>         * Renderiza una sola tarjeta de orden.<br/>         */<br/>        function renderOrderCard(order, docId) {<br/>            const date = order.timestamp ? new Date(order.timestamp.seconds * 1000).toLocaleString(&#39;es-ES&#39;) : &#39;N/A&#39;;<br/>            const statusColor = order.status;<br/>            <br/>            const card = document.createElement(&#39;div&#39;);<br/>            card.className = &#39;bg-white p-5 rounded-xl shadow-md border-l-4 border-indigo-500&#39;;<br/>            card.innerHTML = `<br/>                &lt;div class=&quot;flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-3 mb-3&quot;&gt;<br/>                    &lt;h3 class=&quot;text-xl font-extrabold text-indigo-700&quot;&gt;ORDEN #${docId.substring(0, 8).toUpperCase()}&lt;/h3&gt;<br/>                    &lt;div class=&quot;mt-2 md:mt-0 flex items-center space-x-3&quot;&gt;<br/>                        &lt;span class=&quot;text-sm text-gray-500&quot;&gt;${date}&lt;/span&gt;<br/>                        &lt;span class=&quot;order-status-badge ${statusColor}&quot;&gt;${order.status.replace(&#39;_&#39;, &#39; &#39;)}&lt;/span&gt;<br/>                    &lt;/div&gt;<br/>                &lt;/div&gt;<div></div>                &lt;div class=&quot;grid grid-cols-1 md:grid-cols-3 gap-4 mb-4&quot;&gt;<br/>                    &lt;div&gt;<br/>                        &lt;p class=&quot;font-bold text-gray-700&quot;&gt;Cliente:&lt;/p&gt;<br/>                        &lt;p class=&quot;text-gray-600&quot;&gt;${order.clientInfo.name}&lt;/p&gt;<br/>                    &lt;/div&gt;<br/>                    &lt;div&gt;<br/>                        &lt;p class=&quot;font-bold text-gray-700&quot;&gt;Teléfono:&lt;/p&gt;<br/>                        &lt;p class=&quot;text-blue-600 font-semibold&quot;&gt;${order.clientInfo.phone}&lt;/p&gt;<br/>                    &lt;/div&gt;<br/>                    &lt;div&gt;<br/>                        &lt;p class=&quot;font-bold text-gray-700&quot;&gt;Total:&lt;/p&gt;<br/>                        &lt;p class=&quot;text-2xl font-extrabold text-red-600&quot;&gt;Gs. ${order.totalAmount.toLocaleString(&#39;es-ES&#39;)}&lt;/p&gt;<br/>                    &lt;/div&gt;<br/>                &lt;/div&gt;<div></div>                &lt;div class=&quot;mb-4&quot;&gt;<br/>                    &lt;p class=&quot;font-bold text-gray-700 mb-2&quot;&gt;Dirección:&lt;/p&gt;<br/>                    &lt;p class=&quot;text-gray-600 border p-2 rounded&quot;&gt;${order.clientInfo.address}&lt;/p&gt;<br/>                &lt;/div&gt;<div></div>                &lt;p class=&quot;font-bold text-gray-700 mb-2&quot;&gt;Detalle de Productos:&lt;/p&gt;<br/>                &lt;div class=&quot;order-item-list mb-4&quot;&gt;<br/>                    ${order.items.map(item =&gt; `<br/>                        &lt;div class=&quot;flex justify-between text-sm py-1 border-b last:border-b-0&quot;&gt;<br/>                            &lt;span class=&quot;font-medium text-gray-900&quot;&gt;${item.quantity}x ${item.name} (${item.brand})&lt;/span&gt;<br/>                            &lt;span class=&quot;text-gray-700&quot;&gt;Gs. ${item.subtotal.toLocaleString(&#39;es-ES&#39;)}&lt;/span&gt;<br/>                        &lt;/div&gt;<br/>                    `).join(&#39;&#39;)}<br/>                &lt;/div&gt;<div></div>                &lt;!-- Control de Estado --&gt;<br/>                &lt;div class=&quot;flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-3 border-t&quot;&gt;<br/>                    &lt;select data-id=&quot;${docId}&quot; class=&quot;status-select p-2 border border-gray-300 rounded-lg text-sm bg-white&quot;&gt;<br/>                        &lt;option value=&quot;PENDIENTE&quot; ${order.status === &#39;PENDIENTE&#39; ? &#39;selected&#39; : &#39;&#39;}&gt;PENDIENTE&lt;/option&gt;<br/>                        &lt;option value=&quot;EN_PROCESO&quot; ${order.status === &#39;EN_PROCESO&#39; ? &#39;selected&#39; : &#39;&#39;}&gt;EN PROCESO&lt;/option&gt;<br/>                        &lt;option value=&quot;ENTREGADO&quot; ${order.status === &#39;ENTREGADO&#39; ? &#39;selected&#39; : &#39;&#39;}&gt;ENTREGADO&lt;/option&gt;<br/>                    &lt;/select&gt;<br/>                &lt;/div&gt;<br/>            `;<br/>            elements.orderList.prepend(card); // Agregar al principio para ver lo más nuevo primero<br/>        }<div></div>        /**<br/>         * Maneja los cambios de estado en Firestore.<br/>         */<br/>        function handleStatusChange(e) {<br/>            const docId = e.target.dataset.id;<br/>            const newStatus = e.target.value;<br/>            const db = window.db;<br/>            const { doc, updateDoc } = window.firebaseExports;<br/>            const docRef = doc(db, `/artifacts/${APP_ID}/public/data/orders`, docId);<br/>            <br/>            updateDoc(docRef, {<br/>                status: newStatus,<br/>                updatedAt: new Date()<br/>            }).then(() =&gt; {<br/>                console.log(`Estado de la orden ${docId} actualizado a ${newStatus}`);<br/>            }).catch(error =&gt; {<br/>                console.error(&quot;Error al actualizar el estado:&quot;, error);<br/>            });<br/>        }<div></div>        /**<br/>         * Establece el listener en tiempo real para las órdenes.<br/>         */<br/>        function setupOrderListener() {<br/>            const db = window.db;<br/>            const { collection, onSnapshot } = window.firebaseExports;<br/>            const collectionPath = `/artifacts/${APP_ID}/public/data/orders`;<br/>            <br/>            // Usar onSnapshot para obtener actualizaciones en tiempo real<br/>            onSnapshot(collection(db, collectionPath), (snapshot) =&gt; {<br/>                elements.orderList.innerHTML = &#39;&#39;; // Limpiar la lista actual<br/>                const orders = [];<div></div>                snapshot.forEach(doc =&gt; {<br/>                    orders.push({ docId: doc.id, ...doc.data() });<br/>                });<br/>                <br/>                // Ordenar: PENDIENTE primero, luego por fecha<br/>                orders.sort((a, b) =&gt; {<br/>                    if (a.status === &#39;PENDIENTE&#39; &amp;&amp; b.status !== &#39;PENDIENTE&#39;) return -1;<br/>                    if (a.status !== &#39;PENDIENTE&#39; &amp;&amp; b.status === &#39;PENDIENTE&#39;) return 1;<br/>                    <br/>                    const timeA = a.timestamp?.seconds || 0;<br/>                    const timeB = b.timestamp?.seconds || 0;<br/>                    return timeB - timeA; // Más reciente primero<br/>                });<div></div>                orders.forEach(order =&gt; {<br/>                    renderOrderCard(order, order.docId);<br/>                });<div></div>                // Mostrar mensaje si no hay órdenes<br/>                if (orders.length === 0) {<br/>                    elements.noOrders.classList.remove(&#39;hidden&#39;);<br/>                } else {<br/>                    elements.noOrders.classList.add(&#39;hidden&#39;);<br/>                }<br/>                <br/>                // Adjuntar listeners de cambio de estado<br/>                document.querySelectorAll(&#39;.status-select&#39;).forEach(select =&gt; {<br/>                    select.removeEventListener(&#39;change&#39;, handleStatusChange); // Prevenir duplicados<br/>                    select.addEventListener(&#39;change&#39;, handleStatusChange);<br/>                });<div></div>                elements.loadingIndicator.classList.add(&#39;hidden&#39;);<br/>            }, (error) =&gt; {<br/>                console.error(&quot;Error en el listener de Firestore:&quot;, error);<br/>                elements.orderList.innerHTML = &#39;&lt;p class=&quot;text-red-500 font-bold&quot;&gt;Error al cargar las órdenes.&lt;/p&gt;&#39;;<br/>                elements.loadingIndicator.classList.add(&#39;hidden&#39;);<br/>            });<br/>        }<div></div>        window.mainApp = {<br/>            init: () =&gt; {<br/>                setupOrderListener();<br/>            }<br/>        };<div></div>    &lt;/script&gt;<br/>&lt;/body&gt;<br/>&lt;/html&gt;<div></div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Pedidos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, setLogLevel, updateDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Configuración Global de Firebase (MANDATORIA)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Variables globales
+        let db = null;
+        let auth = null;
+        
+        setLogLevel('debug'); // Activar logs de Firebase
+
+        // Inicializar Firebase
+        if (firebaseConfig) {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // Función de autenticación (usando el token proporcionado o anónimamente)
+            const authenticate = async () => {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        console.log("Autenticación exitosa con token personalizado.");
+                    } else {
+                        await signInAnonymously(auth);
+                        console.log("Autenticación anónima exitosa.");
+                    }
+                    // Una vez autenticado, inicializa la app principal
+                    initDashboard(); 
+                } catch (error) {
+                    console.error("Error de autenticación de Firebase:", error);
+                }
+            };
+            authenticate();
+        } else {
+            document.getElementById('loading-indicator').textContent = "Error: Configuración de Firebase no disponible.";
+            console.error("Configuración de Firebase no disponible.");
+        }
+
+        // --- ESTADO Y ELEMENTOS ---
+        const ELEMENTS = {
+            ordersList: document.getElementById('orders-list'),
+            loadingIndicator: document.getElementById('loading-indicator'),
+        };
+
+        const STATUS_COLORS = {
+            PENDIENTE: 'bg-yellow-100 text-yellow-800',
+            'EN PROCESO': 'bg-blue-100 text-blue-800',
+            ENTREGADO: 'bg-green-100 text-green-800',
+        };
+
+        const ALL_STATUS = ['PENDIENTE', 'EN PROCESO', 'ENTREGADO'];
+
+        // --- FUNCIONES DE ORDENACIÓN ---
+        function sortOrders(orders) {
+            // Ordenar: PENDIENTES primero, y luego por timestamp (el más nuevo primero)
+            return orders.sort((a, b) => {
+                const statusOrder = { PENDIENTE: 1, 'EN PROCESO': 2, ENTREGADO: 3 };
+                
+                if (statusOrder[a.status] !== statusOrder[b.status]) {
+                    return statusOrder[a.status] - statusOrder[b.status];
+                }
+                
+                // Si el timestamp es un objeto Firestore, usa el método toDate()
+                const dateA = a.timestamp && a.timestamp.toDate ? a.timestamp.toDate() : new Date(0);
+                const dateB = b.timestamp && b.timestamp.toDate ? b.timestamp.toDate() : new Date(0);
+                
+                return dateB - dateA; // Más reciente primero
+            });
+        }
+
+        // --- FUNCIÓN DE RENDERIZADO ---
+        function renderOrders(orders) {
+            ELEMENTS.ordersList.innerHTML = '';
+            
+            if (orders.length === 0) {
+                ELEMENTS.ordersList.innerHTML = '<p class="text-center text-gray-500 py-10 text-lg">No hay pedidos registrados.</p>';
+                return;
+            }
+
+            const sortedOrders = sortOrders(orders);
+
+            sortedOrders.forEach(order => {
+                const orderDate = order.timestamp && order.timestamp.toDate ? order.timestamp.toDate().toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' }) : 'Fecha desconocida';
+                const statusColor = STATUS_COLORS[order.status] || 'bg-gray-200 text-gray-700';
+                
+                const orderCard = document.createElement('div');
+                orderCard.className = 'bg-white p-5 rounded-xl shadow-lg border-l-4 ' + (order.status === 'PENDIENTE' ? 'border-red-500' : (order.status === 'EN PROCESO' ? 'border-blue-500' : 'border-green-500'));
+                orderCard.dataset.id = order.id;
+
+                let itemsHtml = order.items.map(item => `
+                    <li class="flex justify-between text-sm text-gray-600 border-b border-gray-100 py-1">
+                        <span class="font-medium">(${item.quantity} U.) ${item.name}</span>
+                        <span class="${item.isRental ? 'text-red-500' : 'text-green-600'}">Gs. ${(item.subtotal || 0).toLocaleString('es-ES')}</span>
+                    </li>
+                `).join('');
+
+                orderCard.innerHTML = `
+                    <div class="flex justify-between items-start border-b pb-3 mb-3">
+                        <div>
+                            <p class="text-xs font-semibold text-gray-500">Pedido #${order.id.substring(0, 8).toUpperCase()}</p>
+                            <p class="text-lg font-bold text-gray-900">${order.clientInfo.name}</p>
+                        </div>
+                        <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusColor}">${order.status}</span>
+                    </div>
+
+                    <div class="space-y-2 mb-4">
+                        <p class="text-sm"><span class="font-semibold text-gray-700">Teléfono:</span> ${order.clientInfo.phone}</p>
+                        <p class="text-sm"><span class="font-semibold text-gray-700">Dirección:</span> ${order.clientInfo.address}</p>
+                        <p class="text-sm"><span class="font-semibold text-gray-700">Fecha:</span> ${orderDate}</p>
+                    </div>
+
+                    <h4 class="text-md font-bold text-gray-800 mt-4 mb-2">Detalle de Productos:</h4>
+                    <ul class="list-none space-y-1 mb-4">${itemsHtml}</ul>
+                    
+                    <div class="flex justify-between items-center pt-3 border-t border-gray-200">
+                        <span class="text-xl font-bold text-gray-900">Total:</span>
+                        <span class="text-2xl font-extrabold text-red-600">Gs. ${order.totalAmount.toLocaleString('es-ES')}</span>
+                    </div>
+
+                    <div class="mt-4 flex flex-col sm:flex-row gap-2">
+                        <!-- Selector de Estado -->
+                        <select data-id="${order.id}" class="status-selector bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5 flex-grow">
+                            ${ALL_STATUS.map(status => `
+                                <option value="${status}" ${order.status === status ? 'selected' : ''}>${status}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                `;
+
+                ELEMENTS.ordersList.appendChild(orderCard);
+            });
+            
+            // Adjuntar listener para el selector de estado
+            document.querySelectorAll('.status-selector').forEach(select => {
+                select.addEventListener('change', handleStatusChange);
+            });
+        }
+
+        // --- MANEJADOR DE CAMBIO DE ESTADO ---
+        async function handleStatusChange(e) {
+            const orderId = e.target.dataset.id;
+            const newStatus = e.target.value;
+            
+            if (!db) {
+                console.error("Conexión a Firestore no establecida.");
+                return;
+            }
+
+            e.target.disabled = true; // Deshabilitar mientras se actualiza
+
+            const collectionPath = `/artifacts/${appId}/public/data/orders`;
+            const orderRef = doc(db, collectionPath, orderId);
+
+            try {
+                await updateDoc(orderRef, {
+                    status: newStatus
+                });
+                console.log(`Estado de orden ${orderId} actualizado a ${newStatus}`);
+                // El onSnapshot se encargará de re-renderizar la lista
+            } catch (error) {
+                console.error("Error al actualizar el estado:", error);
+                alert("Error al actualizar el estado. Revisa la consola.");
+            } finally {
+                e.target.disabled = false;
+            }
+        }
+
+        // --- INICIALIZACIÓN Y SUSCRIPCIÓN ---
+        function initDashboard() {
+            ELEMENTS.loadingIndicator.classList.add('hidden');
+            
+            if (!db || !auth.currentUser) {
+                ELEMENTS.ordersList.innerHTML = '<p class="text-center text-red-500 py-10 text-lg">Error: No se pudo conectar a la base de datos de pedidos.</p>';
+                return;
+            }
+
+            const collectionPath = `/artifacts/${appId}/public/data/orders`;
+            const ordersQuery = query(collection(db, collectionPath));
+
+            // Escuchar cambios en tiempo real
+            onSnapshot(ordersQuery, (snapshot) => {
+                const orders = [];
+                snapshot.forEach(doc => {
+                    orders.push({ id: doc.id, ...doc.data() });
+                });
+                renderOrders(orders);
+                console.log(`Pedidos cargados: ${orders.length}`);
+            }, (error) => {
+                console.error("Error al escuchar pedidos:", error);
+                ELEMENTS.ordersList.innerHTML = `<p class="text-center text-red-500 py-10 text-lg">Error al cargar pedidos: ${error.message}</p>`;
+            });
+        }
+    </script>
+    <style>
+        :root {
+            font-family: 'Inter', sans-serif;
+        }
+        body {
+            background-color: #f3f4f6;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="max-w-6xl mx-auto pt-4 pb-16">
+        <header class="mb-8 p-6 bg-white rounded-xl shadow-md border-b-4 border-indigo-600">
+            <h1 class="text-3xl font-extrabold text-gray-900">ADMINISTRACIÓN DE ÓRDENES</h1>
+            <p class="text-gray-600">Pedidos recibidos en tiempo real para Multigestiones PY.</p>
+        </header>
+
+        <main>
+            <div id="loading-indicator" class="text-center py-10 text-xl text-gray-500">Cargando pedidos...</div>
+            <div id="orders-list" class="space-y-6">
+                <!-- Las tarjetas de pedidos se insertarán aquí -->
+            </div>
+        </main>
+    </div>
+</body>
+</html>
+
