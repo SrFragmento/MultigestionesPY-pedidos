@@ -8,7 +8,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // Configuración Global de Firebase (MANDATORIA)
@@ -20,8 +20,9 @@
         window.app = null;
         window.db = null;
         window.auth = null;
+        window.dbReady = false; // Nuevo indicador de estado de la DB
         
-        setLogLevel('debug'); // Activar logs de Firebase
+        setLogLevel('debug'); 
 
         // Estado Global de la Aplicación
         const state = {
@@ -54,8 +55,9 @@
 
         const authenticate = async () => {
             if (!firebaseConfig) {
-                console.error("Configuración de Firebase no disponible. Saltando conexión.");
-                window.mainApp.init(); // Inicializar app sin DB
+                console.error("Configuración de Firebase no disponible. Cargando modo offline.");
+                window.dbReady = false;
+                window.mainApp.init(); 
                 return;
             }
 
@@ -66,18 +68,17 @@
 
                 if (initialAuthToken) {
                     await signInWithCustomToken(window.auth, initialAuthToken);
-                    console.log("Autenticación exitosa con token personalizado.");
                 } else {
                     await signInAnonymously(window.auth);
-                    console.log("Autenticación anónima exitosa.");
                 }
                 
-                // Una vez autenticado, inicializa la app principal
+                window.dbReady = true; // DB lista
                 window.mainApp.init(); 
 
             } catch (error) {
-                console.error("Error de conexión o autenticación de Firebase:", error);
-                ELEMENTS.loadingIndicator.textContent = "Error de conexión. Recarga la página o verifica la consola.";
+                console.error("Error de conexión o autenticación de Firebase. Cargando modo offline:", error);
+                window.dbReady = false;
+                window.mainApp.init(); // Cargar la app incluso si falla la DB
             }
         };
 
@@ -86,8 +87,6 @@
             addDoc,
             collection,
             serverTimestamp,
-            getAuth,
-            onAuthStateChanged
         };
 
         // --- DEFINICIÓN DE PRODUCTOS Y LÓGICA DE LA APP (MISMO CÓDIGO) ---
@@ -336,12 +335,22 @@
 
             if (needsMinQtyAlert) {
                 elements.minQtyAlert.classList.remove('hidden');
+                // Deshabilitar botón de confirmar si hay problemas de cantidad O si la DB no está lista
+                elements.confirmOrderBtn.disabled = true; 
             } else {
                 elements.minQtyAlert.classList.add('hidden');
+                 // Habilitar si el carrito no está vacío, cumple con la cantidad mínima Y la DB está lista
+                elements.confirmOrderBtn.disabled = !isValid || !elements.clientForm.checkValidity() || !window.dbReady;
             }
-
-            // Habilitar el botón de confirmar solo si el carrito no está vacío, cumple con la cantidad mínima y el formulario es válido
-            elements.confirmOrderBtn.disabled = !isValid || !elements.clientForm.checkValidity();
+           
+            // Mensaje si no hay conexión a DB
+            if (!window.dbReady) {
+                 elements.orderStatus.textContent = "⚠️ No hay conexión para enviar pedidos. Por favor, recarga o revisa tu conexión a Internet.";
+                 elements.orderStatus.classList.remove('hidden');
+                 elements.orderStatus.classList.add('text-red-600');
+            } else if (isValid && window.dbReady) {
+                 elements.orderStatus.classList.add('hidden');
+            }
         }
 
         // --- FUNCIONES DE RENDERIZADO DEL CATÁLOGO ---
@@ -478,8 +487,9 @@
                 console.error("El carrito está vacío. No se puede enviar la orden.");
                 return;
             }
-            if (!window.db || !window.auth.currentUser) {
-                elements.orderStatus.textContent = "Error: Conexión con la base de datos no disponible.";
+            // Verificar si la DB está lista antes de intentar enviar
+            if (!window.dbReady || !window.db || !window.auth.currentUser) {
+                elements.orderStatus.textContent = "Error: Conexión con la base de datos no disponible. Intenta recargar.";
                 elements.orderStatus.classList.remove('hidden');
                 elements.orderStatus.classList.add('text-red-600');
                 return;
@@ -580,11 +590,27 @@
                 setupFilters();
                 setupEventListeners();
                 updateCartUI();
+                // Mostrar alerta si la DB no está lista (modo offline)
+                if (!window.dbReady) {
+                    elements.orderStatus.textContent = "⚠️ No hay conexión para enviar pedidos. Solo se puede navegar. Por favor, recarga.";
+                    elements.orderStatus.classList.remove('hidden');
+                    elements.orderStatus.classList.add('text-red-600');
+                    elements.confirmOrderBtn.disabled = true; // Deshabilitar el botón de envío
+                }
             }
         };
 
         // Iniciar el proceso de autenticación y carga de la aplicación
         authenticate();
+        
+        // Fallback: Si la conexión tarda mucho (5 segundos), carga la aplicación de todos modos.
+        setTimeout(() => {
+            if (elements.loadingIndicator.classList.contains('hidden')) return;
+            console.warn("Conexión tardía. Forzando la carga de la aplicación en modo offline.");
+            window.dbReady = false;
+            window.mainApp.init(); 
+        }, 5000); // 5 segundos de espera máxima
+
     </script>
     <style>
         :root {
